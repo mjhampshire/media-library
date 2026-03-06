@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TWC Media Library - UI Mockup</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      line-height: 1.5;
+    }
+
+    /* Layout */
+    .app {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 240px;
+      background: #1a1a2e;
+      color: white;
+      padding: 20px 0;
+      flex-shrink: 0;
+    }
+
+    .sidebar-logo {
+      padding: 0 20px 20px;
+      font-size: 18px;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 20px;
+    }
+
+    .sidebar-nav a {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .sidebar-nav a:hover {
+      background: rgba(255,255,255,0.05);
+      color: white;
+    }
+
+    .sidebar-nav a.active {
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border-left: 3px solid #6366f1;
+    }
+
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: white;
+      padding: 16px 32px;
+      border-bottom: 1px solid #e5e5e5;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .content {
+      padding: 32px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #6366f1;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #4f46e5;
+    }
+
+    .btn-secondary {
+      background: white;
+      border: 1px solid #d1d5db;
+      color: #374151;
+    }
+
+    .btn-secondary:hover {
+      background: #f9fafb;
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+
+    /* Filters */
+    .filters {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 300px;
+      padding: 10px 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .filter-select {
+      padding: 10px 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+      min-width: 150px;
+    }
+
+    /* Table */
+    .table-container {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      text-align: left;
+      padding: 14px 16px;
+      background: #f9fafb;
+      font-weight: 500;
+      font-size: 13px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    td {
+      padding: 16px;
+      border-bottom: 1px solid #f3f4f6;
+      vertical-align: middle;
+    }
+
+    tr:hover {
+      background: #f9fafb;
+    }
+
+    .asset-preview {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #e5e5e5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #9ca3af;
+      font-size: 24px;
+    }
+
+    .asset-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .asset-title {
+      font-weight: 500;
+      color: #111;
+    }
+
+    .asset-meta {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge-blue {
+      background: #eff6ff;
+      color: #2563eb;
+    }
+
+    .badge-green {
+      background: #ecfdf5;
+      color: #059669;
+    }
+
+    .badge-yellow {
+      background: #fffbeb;
+      color: #d97706;
+    }
+
+    .badge-red {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+
+    .actions-menu {
+      position: relative;
+    }
+
+    .actions-btn {
+      background: none;
+      border: none;
+      padding: 8px;
+      cursor: pointer;
+      border-radius: 6px;
+      color: #6b7280;
+    }
+
+    .actions-btn:hover {
+      background: #f3f4f6;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal {
+      background: white;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #e5e5e5;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #6b7280;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #e5e5e5;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    /* Form */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: #374151;
+    }
+
+    .form-label .required {
+      color: #ef4444;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .form-hint {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    /* Tags */
+    .tags-input {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      min-height: 44px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: #e5e7eb;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .tag-remove {
+      cursor: pointer;
+      color: #6b7280;
+    }
+
+    /* Upload zones */
+    .upload-section {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #e5e5e5;
+    }
+
+    .upload-section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #374151;
+    }
+
+    .upload-variants {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .upload-zone {
+      border: 2px dashed #d1d5db;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .upload-zone:hover {
+      border-color: #6366f1;
+      background: #f5f3ff;
+    }
+
+    .upload-zone.has-file {
+      border-style: solid;
+      border-color: #10b981;
+      background: #ecfdf5;
+    }
+
+    .upload-zone-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 4px;
+    }
+
+    .upload-zone-hint {
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .upload-zone-file {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: #059669;
+      font-size: 14px;
+    }
+
+    .upload-zone-file .remove {
+      color: #6b7280;
+      cursor: pointer;
+    }
+
+    /* Detail panel */
+    .detail-panel {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .detail-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #e5e5e5;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .detail-title {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .detail-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 16px 24px;
+    }
+
+    .alert-warning {
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      color: #92400e;
+    }
+
+    .detail-content {
+      padding: 24px;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 24px;
+    }
+
+    .detail-preview {
+      width: 200px;
+      height: 200px;
+      background: #f3f4f6;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      color: #9ca3af;
+    }
+
+    .detail-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .meta-label {
+      font-size: 12px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .meta-value {
+      font-size: 14px;
+      color: #111;
+    }
+
+    .detail-section {
+      padding: 24px;
+      border-top: 1px solid #e5e5e5;
+    }
+
+    .detail-section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #374151;
+    }
+
+    .variants-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .variant-card {
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .variant-preview {
+      width: 80px;
+      height: 80px;
+      background: #e5e5e5;
+      border-radius: 8px;
+      margin: 0 auto 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: #9ca3af;
+    }
+
+    .variant-name {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .variant-meta {
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 12px;
+    }
+
+    .variant-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    /* Version history */
+    .version-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .version-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+
+    .version-item.current {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+    }
+
+    .version-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .version-number {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .version-meta {
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    /* Categories management */
+    .categories-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .category-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+
+    .category-item.default {
+      background: #f3f4f6;
+    }
+
+    .category-name {
+      font-weight: 500;
+    }
+
+    .category-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      background: #e5e7eb;
+      border-radius: 4px;
+      color: #6b7280;
+      margin-left: 8px;
+    }
+
+    .category-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Navigation tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .tab {
+      padding: 12px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #6b7280;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.2s;
+    }
+
+    .tab:hover {
+      color: #374151;
+    }
+
+    .tab.active {
+      color: #6366f1;
+      border-bottom-color: #6366f1;
+    }
+
+    /* Page indicator */
+    .page-indicator {
+      text-align: center;
+      padding: 20px;
+      background: #f0f0f0;
+      color: #666;
+      font-size: 14px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+
+    .screen-divider {
+      margin: 60px 0;
+      border: none;
+      border-top: 3px dashed #d1d5db;
+      position: relative;
+    }
+
+    .screen-divider::after {
+      content: attr(data-label);
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #f5f5f5;
+      padding: 0 16px;
+      font-size: 14px;
+      color: #6b7280;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">TWC Backoffice</div>
+      <nav class="sidebar-nav">
+        <a href="#">
+          <span>📊</span> Dashboard
+        </a>
+        <a href="#">
+          <span>👥</span> Customers
+        </a>
+        <a href="#">
+          <span>📦</span> Orders
+        </a>
+        <a href="#">
+          <span>💬</span> Outreach
+        </a>
+        <a href="#" class="active">
+          <span>🖼️</span> Media Library
+        </a>
+        <a href="#">
+          <span>⚙️</span> Settings
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main">
+      <header class="header">
+        <h1>Media Library</h1>
+        <button class="btn btn-primary" onclick="showModal('upload')">+ Upload Media</button>
+      </header>
+
+      <div class="content">
+        <div class="page-indicator">
+          Screen 1 of 4: Media Library List
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <div class="tab active">All Media</div>
+          <div class="tab">Categories</div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+          <input type="text" class="search-input" placeholder="Search media...">
+          <select class="filter-select">
+            <option>All Categories</option>
+            <option>Collection</option>
+            <option>Invitation</option>
+            <option>Promotion</option>
+            <option>VIP Event</option>
+          </select>
+          <select class="filter-select">
+            <option>Active</option>
+            <option>Expired</option>
+            <option>Archived</option>
+            <option>All Status</option>
+          </select>
+        </div>
+
+        <!-- Table -->
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 80px">Preview</th>
+                <th>Title</th>
+                <th>Category</th>
+                <th>Variants</th>
+                <th>Expires</th>
+                <th>Status</th>
+                <th style="width: 60px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="asset-preview">📄</div>
+                </td>
+                <td>
+                  <div class="asset-info">
+                    <span class="asset-title">Summer 2025 Collection</span>
+                    <span class="asset-meta">PDF • 8.5 MB • v2 • Updated Mar 5</span>
+                  </div>
+                </td>
+                <td><span class="badge badge-blue">Collection</span></td>
+                <td>
+                  <span class="badge badge-green" style="margin-right: 4px">SMS</span>
+                  <span class="badge badge-green">Email</span>
+                </td>
+                <td>Jun 1, 2025</td>
+                <td><span class="badge badge-green">Active</span></td>
+                <td>
+                  <button class="actions-btn">⋮</button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="asset-preview">🖼️</div>
+                </td>
+                <td>
+                  <div class="asset-info">
+                    <span class="asset-title">VIP Event Invitation - March</span>
+                    <span class="asset-meta">PNG • 1.2 MB • v1 • Created Feb 28</span>
+                  </div>
+                </td>
+                <td><span class="badge badge-blue">Invitation</span></td>
+                <td>
+                  <span class="badge badge-green" style="margin-right: 4px">SMS</span>
+                  <span class="badge badge-green">Email</span>
+                </td>
+                <td>Mar 15, 2025</td>
+                <td><span class="badge badge-yellow">⚠️ Expiring Soon</span></td>
+                <td>
+                  <button class="actions-btn">⋮</button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="asset-preview">📄</div>
+                </td>
+                <td>
+                  <div class="asset-info">
+                    <span class="asset-title">Winter Sale Banner</span>
+                    <span class="asset-meta">JPG • 450 KB • v1 • Created Jan 10</span>
+                  </div>
+                </td>
+                <td><span class="badge badge-blue">Promotion</span></td>
+                <td>
+                  <span class="badge badge-green">Email</span>
+                </td>
+                <td>Feb 28, 2025</td>
+                <td><span class="badge badge-red">Expired</span></td>
+                <td>
+                  <button class="actions-btn">⋮</button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="asset-preview">🖼️</div>
+                </td>
+                <td>
+                  <div class="asset-info">
+                    <span class="asset-title">Brand Logo - Dark</span>
+                    <span class="asset-meta">PNG • 120 KB • v3 • Updated Feb 20</span>
+                  </div>
+                </td>
+                <td><span class="badge badge-blue">Brand</span></td>
+                <td>
+                  <span class="badge badge-green" style="margin-right: 4px">SMS</span>
+                  <span class="badge badge-green">Email</span>
+                </td>
+                <td>—</td>
+                <td><span class="badge badge-green">Active</span></td>
+                <td>
+                  <button class="actions-btn">⋮</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p style="text-align: center; color: #6b7280; margin-top: 16px; font-size: 14px;">
+          Showing 1-4 of 12 assets
+        </p>
+
+        <!-- Screen 2: Upload Modal -->
+        <hr class="screen-divider" data-label="Screen 2: Upload Modal">
+
+        <div class="page-indicator">
+          Screen 2 of 4: Upload Media Modal
+        </div>
+
+        <div style="background: rgba(0,0,0,0.3); padding: 40px; border-radius: 12px;">
+          <div class="modal" style="margin: 0 auto;">
+            <div class="modal-header">
+              <h2>Upload Media</h2>
+              <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="form-group">
+                <label class="form-label">Title <span class="required">*</span></label>
+                <input type="text" class="form-input" value="Summer 2025 Collection">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Description</label>
+                <input type="text" class="form-input" placeholder="Optional description...">
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Category <span class="required">*</span></label>
+                  <select class="form-input">
+                    <option>Collection</option>
+                    <option>Invitation</option>
+                    <option>Promotion</option>
+                    <option>Brand</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Expiry Date</label>
+                  <input type="date" class="form-input" value="2025-06-01">
+                  <span class="form-hint">Leave blank for no expiry</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Tags</label>
+                <div class="tags-input">
+                  <span class="tag">summer <span class="tag-remove">&times;</span></span>
+                  <span class="tag">2025 <span class="tag-remove">&times;</span></span>
+                  <span class="tag">lookbook <span class="tag-remove">&times;</span></span>
+                </div>
+              </div>
+
+              <div class="upload-section">
+                <h3>Upload Variants</h3>
+                <div class="upload-variants">
+                  <div class="upload-zone has-file">
+                    <div class="upload-zone-file">
+                      ✓ Summer_2025_SMS.jpg (850 KB) <span class="remove">&times;</span>
+                    </div>
+                    <div class="upload-zone-label" style="margin-top: 8px">SMS Version</div>
+                    <div class="upload-zone-hint">Max 1.2 MB • JPG, PNG recommended</div>
+                  </div>
+
+                  <div class="upload-zone has-file">
+                    <div class="upload-zone-file">
+                      ✓ Summer_2025_Email.pdf (2.5 MB) <span class="remove">&times;</span>
+                    </div>
+                    <div class="upload-zone-label" style="margin-top: 8px">Email Version</div>
+                    <div class="upload-zone-hint">Max 10 MB • PDF, JPG, PNG</div>
+                  </div>
+
+                  <div class="upload-zone">
+                    <div style="font-size: 24px; margin-bottom: 8px;">📁</div>
+                    <div class="upload-zone-label">Original (Optional)</div>
+                    <div class="upload-zone-hint">Max 10 MB • Full quality archive</div>
+                  </div>
+                </div>
+                <p class="form-hint" style="margin-top: 12px;">ℹ️ At least one variant (SMS or Email) is required</p>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary">Cancel</button>
+              <button class="btn btn-primary">Upload & Save</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Screen 3: Asset Detail -->
+        <hr class="screen-divider" data-label="Screen 3: Asset Detail">
+
+        <div class="page-indicator">
+          Screen 3 of 4: Asset Detail View
+        </div>
+
+        <div class="detail-panel">
+          <div class="detail-header">
+            <h2 class="detail-title">Summer 2025 Collection</h2>
+            <div class="detail-actions">
+              <button class="btn btn-secondary btn-sm">Edit</button>
+              <button class="btn btn-secondary btn-sm">Delete</button>
+              <button class="btn btn-secondary btn-sm">Archive</button>
+            </div>
+          </div>
+
+          <div class="alert alert-warning">
+            ⚠️ This asset will expire on Jun 1, 2025
+            <button class="btn btn-sm btn-secondary" style="margin-left: auto;">Extend</button>
+          </div>
+
+          <div class="detail-content">
+            <div class="detail-grid">
+              <div class="detail-preview">📄</div>
+              <div class="detail-meta">
+                <div class="meta-item">
+                  <span class="meta-label">Status</span>
+                  <span class="meta-value"><span class="badge badge-green">Active</span></span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">Category</span>
+                  <span class="meta-value">Collection</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">Created</span>
+                  <span class="meta-value">Mar 1, 2025 by Jane Smith</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">Updated</span>
+                  <span class="meta-value">Mar 5, 2025 by John Doe</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">Expires</span>
+                  <span class="meta-value">Jun 1, 2025</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">Version</span>
+                  <span class="meta-value">v2</span>
+                </div>
+                <div class="meta-item" style="grid-column: span 2;">
+                  <span class="meta-label">Tags</span>
+                  <span class="meta-value">
+                    <span class="tag">summer</span>
+                    <span class="tag">2025</span>
+                    <span class="tag">lookbook</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <h3>Variants</h3>
+            <div class="variants-grid">
+              <div class="variant-card">
+                <div class="variant-preview">🖼️</div>
+                <div class="variant-name">SMS</div>
+                <div class="variant-meta">JPG • 850 KB</div>
+                <div class="variant-actions">
+                  <button class="btn btn-secondary btn-sm">Copy URL</button>
+                  <button class="btn btn-secondary btn-sm">↓</button>
+                </div>
+              </div>
+              <div class="variant-card">
+                <div class="variant-preview">📄</div>
+                <div class="variant-name">Email</div>
+                <div class="variant-meta">PDF • 2.5 MB</div>
+                <div class="variant-actions">
+                  <button class="btn btn-secondary btn-sm">Copy URL</button>
+                  <button class="btn btn-secondary btn-sm">↓</button>
+                </div>
+              </div>
+              <div class="variant-card">
+                <div class="variant-preview">📄</div>
+                <div class="variant-name">Original</div>
+                <div class="variant-meta">PDF • 8.5 MB</div>
+                <div class="variant-actions">
+                  <button class="btn btn-secondary btn-sm">Download</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="margin: 0;">Version History</h3>
+              <button class="btn btn-secondary btn-sm">Upload New Version</button>
+            </div>
+            <div class="version-list">
+              <div class="version-item current">
+                <div class="version-info">
+                  <span class="version-number">v2 (current)</span>
+                  <span class="version-meta">Mar 5, 2025 • John Doe • "Updated cover image"</span>
+                </div>
+              </div>
+              <div class="version-item">
+                <div class="version-info">
+                  <span class="version-number">v1</span>
+                  <span class="version-meta">Mar 1, 2025 • Jane Smith • Initial upload</span>
+                </div>
+                <button class="btn btn-secondary btn-sm">Restore</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Screen 4: Categories Management -->
+        <hr class="screen-divider" data-label="Screen 4: Category Management">
+
+        <div class="page-indicator">
+          Screen 4 of 4: Category Management (Settings Tab)
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <div class="tab">All Media</div>
+          <div class="tab active">Categories</div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <p style="color: #6b7280; font-size: 14px;">Manage categories for organizing your media assets</p>
+          <button class="btn btn-primary btn-sm">+ Add Category</button>
+        </div>
+
+        <div class="table-container" style="padding: 16px;">
+          <div class="categories-list">
+            <div class="category-item default">
+              <div>
+                <span class="category-name">Collection</span>
+                <span class="category-badge">Default</span>
+              </div>
+              <div class="category-actions">
+                <span style="color: #9ca3af; font-size: 13px;">3 assets</span>
+              </div>
+            </div>
+            <div class="category-item default">
+              <div>
+                <span class="category-name">Invitation</span>
+                <span class="category-badge">Default</span>
+              </div>
+              <div class="category-actions">
+                <span style="color: #9ca3af; font-size: 13px;">2 assets</span>
+              </div>
+            </div>
+            <div class="category-item default">
+              <div>
+                <span class="category-name">Promotion</span>
+                <span class="category-badge">Default</span>
+              </div>
+              <div class="category-actions">
+                <span style="color: #9ca3af; font-size: 13px;">5 assets</span>
+              </div>
+            </div>
+            <div class="category-item default">
+              <div>
+                <span class="category-name">Product</span>
+                <span class="category-badge">Default</span>
+              </div>
+              <div class="category-actions">
+                <span style="color: #9ca3af; font-size: 13px;">0 assets</span>
+              </div>
+            </div>
+            <div class="category-item default">
+              <div>
+                <span class="category-name">Brand</span>
+                <span class="category-badge">Default</span>
+              </div>
+              <div class="category-actions">
+                <span style="color: #9ca3af; font-size: 13px;">2 assets</span>
+              </div>
+            </div>
+            <div class="category-item">
+              <div>
+                <span class="category-name">VIP Event</span>
+              </div>
+              <div class="category-actions">
+                <span style="color: #9ca3af; font-size: 13px; margin-right: 12px;">1 asset</span>
+                <button class="btn btn-secondary btn-sm">Edit</button>
+                <button class="btn btn-secondary btn-sm" style="color: #ef4444;">Delete</button>
+              </div>
+            </div>
+            <div class="category-item">
+              <div>
+                <span class="category-name">Staff Training</span>
+              </div>
+              <div class="category-actions">
+                <span style="color: #9ca3af; font-size: 13px; margin-right: 12px;">0 assets</span>
+                <button class="btn btn-secondary btn-sm">Edit</button>
+                <button class="btn btn-secondary btn-sm" style="color: #ef4444;">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p style="color: #6b7280; font-size: 13px; margin-top: 16px;">
+          ℹ️ Default categories cannot be deleted. Custom categories can only be deleted when they have no assets.
+        </p>
+
+        <!-- Screen 5: Front-Office Media Picker -->
+        <hr class="screen-divider" data-label="Screen 5: Front-Office Media Picker">
+
+        <div class="page-indicator">
+          Screen 5 of 5: Media Picker (Front-Office / Outreach Composer)
+        </div>
+
+        <p style="color: #6b7280; font-size: 14px; margin-bottom: 24px;">
+          This modal appears when composing an SMS or Email in the clienteling app. The picker auto-selects the correct variant based on message type.
+        </p>
+
+        <!-- Context: SMS Compose -->
+        <div style="background: #f9fafb; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+          <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">CONTEXT: Composing SMS to customer</div>
+          <div style="background: white; border-radius: 8px; padding: 16px; border: 1px solid #e5e5e5;">
+            <div style="font-size: 14px; color: #374151; margin-bottom: 12px;">
+              <strong>To:</strong> Sarah Johnson (+61 412 345 678)
+            </div>
+            <div style="background: #f3f4f6; border-radius: 8px; padding: 12px; font-size: 14px; color: #374151;">
+              Hi Sarah! Our new Summer collection has arrived. Check out the lookbook: <span style="color: #6366f1;">[+ Add Media]</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Media Picker Modal -->
+        <div style="background: rgba(0,0,0,0.3); padding: 40px; border-radius: 12px;">
+          <div class="modal" style="margin: 0 auto; max-width: 700px;">
+            <div class="modal-header">
+              <div>
+                <h2 style="margin-bottom: 4px;">Add Media</h2>
+                <span style="font-size: 13px; color: #6b7280;">Selecting for <span class="badge badge-blue">SMS</span> — optimized version will be used</span>
+              </div>
+              <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 16px;">
+              <!-- Search -->
+              <div style="margin-bottom: 16px;">
+                <input type="text" class="form-input" placeholder="Search media..." style="width: 100%;">
+              </div>
+
+              <!-- Category Pills -->
+              <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+                <button class="btn btn-primary btn-sm">All</button>
+                <button class="btn btn-secondary btn-sm">Collection</button>
+                <button class="btn btn-secondary btn-sm">Invitation</button>
+                <button class="btn btn-secondary btn-sm">Promotion</button>
+                <button class="btn btn-secondary btn-sm">Brand</button>
+              </div>
+
+              <!-- Media Grid -->
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-height: 400px; overflow-y: auto; padding: 4px;">
+
+                <!-- Selected Item -->
+                <div style="border: 2px solid #6366f1; border-radius: 12px; overflow: hidden; cursor: pointer; position: relative; background: white;">
+                  <div style="position: absolute; top: 8px; right: 8px; background: #6366f1; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;">✓</div>
+                  <div style="height: 120px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #9ca3af;">📄</div>
+                  <div style="padding: 12px;">
+                    <div style="font-size: 13px; font-weight: 500; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Summer 2025 Collection</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-size: 11px; color: #6b7280;">Collection</span>
+                      <span class="badge badge-green" style="font-size: 10px;">SMS Ready</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Available Item -->
+                <div style="border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; cursor: pointer; background: white; transition: all 0.2s;" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#e5e5e5'">
+                  <div style="height: 120px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #9ca3af;">🖼️</div>
+                  <div style="padding: 12px;">
+                    <div style="font-size: 13px; font-weight: 500; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">VIP Event Invitation</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-size: 11px; color: #6b7280;">Invitation</span>
+                      <span class="badge badge-green" style="font-size: 10px;">SMS Ready</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Available Item -->
+                <div style="border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; cursor: pointer; background: white; transition: all 0.2s;" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#e5e5e5'">
+                  <div style="height: 120px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #9ca3af;">🖼️</div>
+                  <div style="padding: 12px;">
+                    <div style="font-size: 13px; font-weight: 500; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Brand Logo - Dark</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-size: 11px; color: #6b7280;">Brand</span>
+                      <span class="badge badge-green" style="font-size: 10px;">SMS Ready</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- No SMS variant - shows warning -->
+                <div style="border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; cursor: not-allowed; background: white; opacity: 0.6;">
+                  <div style="height: 120px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #9ca3af;">📄</div>
+                  <div style="padding: 12px;">
+                    <div style="font-size: 13px; font-weight: 500; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Winter Sale Banner</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-size: 11px; color: #6b7280;">Promotion</span>
+                      <span class="badge badge-yellow" style="font-size: 10px;">No SMS</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Available Item -->
+                <div style="border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; cursor: pointer; background: white; transition: all 0.2s;" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#e5e5e5'">
+                  <div style="height: 120px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #9ca3af;">🖼️</div>
+                  <div style="padding: 12px;">
+                    <div style="font-size: 13px; font-weight: 500; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">New Arrivals Promo</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-size: 11px; color: #6b7280;">Promotion</span>
+                      <span class="badge badge-green" style="font-size: 10px;">SMS Ready</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Available Item -->
+                <div style="border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; cursor: pointer; background: white; transition: all 0.2s;" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#e5e5e5'">
+                  <div style="height: 120px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #9ca3af;">📄</div>
+                  <div style="padding: 12px;">
+                    <div style="font-size: 13px; font-weight: 500; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Autumn Lookbook</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-size: 11px; color: #6b7280;">Collection</span>
+                      <span class="badge badge-green" style="font-size: 10px;">SMS Ready</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+            <div class="modal-footer" style="justify-content: space-between;">
+              <div style="font-size: 13px; color: #6b7280;">
+                <strong>Selected:</strong> Summer 2025 Collection <span style="color: #059669;">(850 KB)</span>
+              </div>
+              <div style="display: flex; gap: 12px;">
+                <button class="btn btn-secondary">Cancel</button>
+                <button class="btn btn-primary">Add to Message</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Result Preview -->
+        <div style="background: #f9fafb; border-radius: 12px; padding: 24px; margin-top: 24px;">
+          <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">RESULT: After selecting media</div>
+          <div style="background: white; border-radius: 8px; padding: 16px; border: 1px solid #e5e5e5;">
+            <div style="font-size: 14px; color: #374151; margin-bottom: 12px;">
+              <strong>To:</strong> Sarah Johnson (+61 412 345 678)
+            </div>
+            <div style="background: #f3f4f6; border-radius: 8px; padding: 12px; font-size: 14px; color: #374151;">
+              Hi Sarah! Our new Summer collection has arrived. Check out the lookbook:
+            </div>
+            <div style="margin-top: 12px; padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; display: flex; align-items: center; gap: 12px;">
+              <div style="width: 48px; height: 48px; background: #e5e5e5; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 20px;">📄</div>
+              <div style="flex: 1;">
+                <div style="font-size: 13px; font-weight: 500;">Summer 2025 Collection</div>
+                <div style="font-size: 12px; color: #6b7280;">SMS version • 850 KB</div>
+              </div>
+              <button style="background: none; border: none; color: #6b7280; cursor: pointer; font-size: 18px;">&times;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Email variant example -->
+        <hr class="screen-divider" data-label="Alternate: Email Context">
+
+        <div class="page-indicator">
+          Same picker, but for Email composition (shows different variant availability)
+        </div>
+
+        <div style="background: rgba(0,0,0,0.3); padding: 40px; border-radius: 12px;">
+          <div class="modal" style="margin: 0 auto; max-width: 700px;">
+            <div class="modal-header">
+              <div>
+                <h2 style="margin-bottom: 4px;">Add Media</h2>
+                <span style="font-size: 13px; color: #6b7280;">Selecting for <span class="badge" style="background: #fef3c7; color: #92400e;">Email</span> — full quality version will be used</span>
+              </div>
+              <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 16px;">
+              <div style="margin-bottom: 16px;">
+                <input type="text" class="form-input" placeholder="Search media..." style="width: 100%;">
+              </div>
+
+              <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+                <button class="btn btn-primary btn-sm">All</button>
+                <button class="btn btn-secondary btn-sm">Collection</button>
+                <button class="btn btn-secondary btn-sm">Invitation</button>
+                <button class="btn btn-secondary btn-sm">Promotion</button>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                <div style="border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; cursor: pointer; background: white;">
+                  <div style="height: 120px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #9ca3af;">📄</div>
+                  <div style="padding: 12px;">
+                    <div style="font-size: 13px; font-weight: 500; margin-bottom: 4px;">Summer 2025 Collection</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-size: 11px; color: #6b7280;">Collection</span>
+                      <span class="badge badge-green" style="font-size: 10px;">2.5 MB</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- This one now works for email! -->
+                <div style="border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; cursor: pointer; background: white;">
+                  <div style="height: 120px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #9ca3af;">📄</div>
+                  <div style="padding: 12px;">
+                    <div style="font-size: 13px; font-weight: 500; margin-bottom: 4px;">Winter Sale Banner</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-size: 11px; color: #6b7280;">Promotion</span>
+                      <span class="badge badge-green" style="font-size: 10px;">1.8 MB</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; cursor: pointer; background: white;">
+                  <div style="height: 120px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #9ca3af;">🖼️</div>
+                  <div style="padding: 12px;">
+                    <div style="font-size: 13px; font-weight: 500; margin-bottom: 4px;">VIP Event Invitation</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-size: 11px; color: #6b7280;">Invitation</span>
+                      <span class="badge badge-green" style="font-size: 10px;">3.2 MB</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary">Cancel</button>
+              <button class="btn btn-primary">Add to Message</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</body>
+</html>
