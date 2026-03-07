@@ -67,7 +67,7 @@ As a backoffice user, I want to get a presigned URL for uploading files directly
   - Email: 10 MB max
   - Original: 10 MB max
 - [ ] Validates MIME type per variant:
-  - SMS: image/jpeg, image/png only
+  - SMS: image/jpeg, image/png, application/pdf
   - WhatsApp: image/jpeg, image/png only (no PDF)
   - Email: image/jpeg, image/png, application/pdf
 - [ ] Returns presigned URL valid for 1 hour
@@ -248,7 +248,7 @@ As a backoffice user, I want to upload new media assets with channel-specific va
 **Acceptance Criteria:**
 - [ ] Modal with form: title, description, category, expiry date, tags
 - [ ] Four upload zones for variants:
-  - SMS (max 1.2 MB, JPG/PNG only)
+  - SMS (max 1.2 MB, JPG/PNG/PDF)
   - WhatsApp (max 5 MB, JPG/PNG only)
   - Email (max 10 MB, JPG/PNG/PDF)
   - Original (max 10 MB, optional)

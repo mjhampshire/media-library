@@ -123,7 +123,7 @@ In Phase 1, variants are **manually uploaded** by the user. Each variant is tagg
 
 | Variant | Description | Max Size | Formats | Channel Use |
 |---------|-------------|----------|---------|-------------|
-| `sms` | Optimized for MMS | 1.2 MB | JPG, PNG | MMS messages |
+| `sms` | Optimized for MMS | 1.2 MB | JPG, PNG, PDF | MMS messages |
 | `whatsapp` | WhatsApp Business API | 5 MB | JPG, PNG | WhatsApp messages |
 | `email` | Email attachments | 10 MB | PDF, JPG, PNG | Email campaigns |
 | `original` | Full quality archive | 10 MB | PDF, PNG, JPG | Backup/source |
@@ -536,7 +536,7 @@ In Phase 1, users manually upload each variant. No auto-generation.
 
 | Variant | Max Size | Allowed Formats | Notes |
 |---------|----------|-----------------|-------|
-| SMS | 1.2 MB | JPG, PNG | Compressed image for MMS |
+| SMS | 1.2 MB | JPG, PNG, PDF | Compressed for MMS |
 | WhatsApp | 5 MB | JPG, PNG | WhatsApp Business API (no PDF) |
 | Email | 10 MB | PDF, JPG, PNG | Higher quality for email |
 | Original | 10 MB | PDF, JPG, PNG | Full quality archive |
@@ -644,7 +644,7 @@ Backoffice Menu
 │  │ SMS Version (max 1.2 MB)                                          │ │
 │  │ ┌─────────────────────────────────────────────────────────────┐   │ │
 │  │ │  📁 Drag & drop or click to browse                          │   │ │
-│  │ │     JPG, PNG only                                            │   │ │
+│  │ │     JPG, PNG, PDF                                            │   │ │
 │  │ └─────────────────────────────────────────────────────────────┘   │ │
 │  │ ✓ Summer_2025_SMS.jpg (850 KB)                           [×]     │ │
 │  └───────────────────────────────────────────────────────────────────┘ │
