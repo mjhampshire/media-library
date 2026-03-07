@@ -104,6 +104,12 @@ In Phase 1, variants are **manually uploaded** by the user. Each variant is tagg
     "fileSize": 850000,
     "mimeType": "image/jpeg"
   },
+  "whatsapp": {
+    "s3Key": "media/tenant123/abc123/v1/whatsapp.jpg",
+    "fileName": "Summer_2025_WhatsApp.jpg",
+    "fileSize": 2500000,
+    "mimeType": "image/jpeg"
+  },
   "email": {
     "s3Key": "media/tenant123/abc123/v1/email.pdf",
     "fileName": "Summer_2025_Email.pdf",
@@ -115,11 +121,19 @@ In Phase 1, variants are **manually uploaded** by the user. Each variant is tagg
 
 #### Variant Types
 
-| Variant | Description | Max Size | Typical Formats |
-|---------|-------------|----------|-----------------|
-| `original` | Full quality original | 10 MB | PDF, PNG, JPG |
-| `sms` | Optimized for MMS/SMS | 1.2 MB | JPG, PNG |
-| `email` | Optimized for email | 10 MB | PDF, JPG, PNG |
+| Variant | Description | Max Size | Formats | Channel Use |
+|---------|-------------|----------|---------|-------------|
+| `sms` | Optimized for MMS | 1.2 MB | JPG, PNG | MMS messages |
+| `whatsapp` | WhatsApp Business API | 5 MB | JPG, PNG | WhatsApp messages |
+| `email` | Email attachments | 10 MB | PDF, JPG, PNG | Email campaigns |
+| `original` | Full quality archive | 10 MB | PDF, PNG, JPG | Backup/source |
+
+**WhatsApp Notes:**
+- WhatsApp Business API requires images to be uploaded to Meta's servers
+- Media IDs expire after ~24 hours, requiring re-upload for reuse
+- Only JPEG and PNG supported (no PDF, GIF, or WebP for images)
+- Max 5MB per image file
+- See [WhatsApp Media API docs](https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media)
 
 **Phase 2:** Auto-generate variants from original upload using Lambda + Sharp/Ghostscript.
 
@@ -184,11 +198,13 @@ twc-media-{env}/
 │   │   │   ├── original.pdf
 │   │   │   ├── thumbnail.jpg
 │   │   │   ├── sms.jpg
+│   │   │   ├── whatsapp.jpg
 │   │   │   └── email.jpg
 │   │   └── v2/
 │   │       ├── original.pdf
 │   │       ├── thumbnail.jpg
 │   │       ├── sms.jpg
+│   │       ├── whatsapp.jpg
 │   │       └── email.jpg
 │   └── {assetId2}/
 │       └── ...
@@ -518,9 +534,10 @@ In Phase 1, users manually upload each variant. No auto-generation.
 
 ### Upload Guidelines (shown in UI)
 
-| Variant | Max Size | Recommended Formats | Notes |
-|---------|----------|---------------------|-------|
+| Variant | Max Size | Allowed Formats | Notes |
+|---------|----------|-----------------|-------|
 | SMS | 1.2 MB | JPG, PNG | Compressed image for MMS |
+| WhatsApp | 5 MB | JPG, PNG | WhatsApp Business API (no PDF) |
 | Email | 10 MB | PDF, JPG, PNG | Higher quality for email |
 | Original | 10 MB | PDF, JPG, PNG | Full quality archive |
 
@@ -627,9 +644,17 @@ Backoffice Menu
 │  │ SMS Version (max 1.2 MB)                                          │ │
 │  │ ┌─────────────────────────────────────────────────────────────┐   │ │
 │  │ │  📁 Drag & drop or click to browse                          │   │ │
-│  │ │     JPG, PNG recommended                                     │   │ │
+│  │ │     JPG, PNG only                                            │   │ │
 │  │ └─────────────────────────────────────────────────────────────┘   │ │
 │  │ ✓ Summer_2025_SMS.jpg (850 KB)                           [×]     │ │
+│  └───────────────────────────────────────────────────────────────────┘ │
+│                                                                         │
+│  ┌───────────────────────────────────────────────────────────────────┐ │
+│  │ WhatsApp Version (max 5 MB)                                       │ │
+│  │ ┌─────────────────────────────────────────────────────────────┐   │ │
+│  │ │  📁 Drag & drop or click to browse                          │   │ │
+│  │ │     JPG, PNG only (no PDF)                                   │   │ │
+│  │ └─────────────────────────────────────────────────────────────┘   │ │
 │  └───────────────────────────────────────────────────────────────────┘ │
 │                                                                         │
 │  ┌───────────────────────────────────────────────────────────────────┐ │
@@ -648,7 +673,7 @@ Backoffice Menu
 │  │ └─────────────────────────────────────────────────────────────┘   │ │
 │  └───────────────────────────────────────────────────────────────────┘ │
 │                                                                         │
-│  ⓘ At least one variant (SMS or Email) is required                    │
+│  ⓘ At least one variant (SMS, WhatsApp, or Email) is required         │
 │                                                                         │
 │                                          [Cancel]  [Upload & Save]     │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -678,13 +703,13 @@ Backoffice Menu
 ├─────────────────────────────────────────────────────────────────────────┤
 │  Variants                                                               │
 │                                                                         │
-│  ┌────────────────────┬────────────────────┬────────────────────┐      │
-│  │  Original          │  SMS               │  Email             │      │
-│  │  [icon]            │  [thumb]           │  [thumb]           │      │
-│  │  PDF 8.5MB         │  JPG 850KB         │  PDF 2.5MB         │      │
-│  │  [Download]        │  [Copy URL]        │  [Copy URL]        │      │
-│  │                    │  [Download]        │  [Download]        │      │
-│  └────────────────────┴────────────────────┴────────────────────┘      │
+│  ┌─────────────┬─────────────┬─────────────┬─────────────┐             │
+│  │  SMS        │  WhatsApp   │  Email      │  Original   │             │
+│  │  [thumb]    │  [thumb]    │  [thumb]    │  [icon]     │             │
+│  │  JPG 850KB  │  JPG 2.5MB  │  PDF 2.5MB  │  PDF 8.5MB  │             │
+│  │  [Copy URL] │  [Copy URL] │  [Copy URL] │  [Download] │             │
+│  │  [Download] │  [Download] │  [Download] │             │             │
+│  └─────────────┴─────────────┴─────────────┴─────────────┘             │
 │                                                                         │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  Version History                                    [Upload New Version]│
@@ -740,8 +765,18 @@ When composing an SMS or email in the clienteling app:
 
 The "Add from Media Library" button opens a picker that:
 1. Shows active media assets
-2. Auto-selects the appropriate variant (SMS for SMS, Email for email)
+2. Auto-selects the appropriate variant based on channel:
+   - SMS → uses `sms` variant
+   - WhatsApp → uses `whatsapp` variant
+   - Email → uses `email` variant
 3. Returns the presigned URL to embed
+
+**WhatsApp Integration Note:**
+When sending via WhatsApp, the outreach service must:
+1. Fetch the `whatsapp` variant URL
+2. Upload to Meta's servers via WhatsApp Cloud API
+3. Use the returned `media_id` in the message
+4. Handle media_id expiry (~24h) for scheduled messages
 
 ---
 
