@@ -793,6 +793,363 @@ When sending via WhatsApp, the outreach service must:
 
 ---
 
+## Customer Media
+
+In addition to the shared media library, the system captures media exchanged between staff and customers. This enables:
+
+- **Inbound documents** - Signed waivers, ID photos, customer-provided images
+- **Outbound documents** - Personalised lookbooks, custom quotes, legal forms sent
+- **Full history** - View all media associated with a customer in their profile
+
+### Storage Strategy
+
+To avoid storage explosion from campaigns (sending same image to 10,000 customers), we use a reference-based approach:
+
+| Media Type | Storage | Rationale |
+|------------|---------|-----------|
+| **Inbound from customer** | Full copy (S3) | Unique content, legal/compliance value |
+| **Outbound - from library** | Reference only | Link to TWC_MEDIA_ASSET, no duplication |
+| **Outbound - customised** | Full copy (S3) | Personalised lookbooks, custom quotes |
+
+### Retention Policy
+
+Customer media is retained **indefinitely** for:
+- Legal documents (waivers, contracts)
+- Inbound customer content
+- Customised outbound (quotes, personalised lookbooks)
+
+Library-referenced outbound follows the library asset's lifecycle.
+
+---
+
+### Customer Media (DynamoDB)
+
+```
+Table: TWC_CUSTOMER_MEDIA
+
+Partition Key: tenantId (String)
+Sort Key: customerId#mediaId (String)
+
+GSI1: tenantId-customerId-index
+  - PK: tenantId
+  - SK: customerId#createdAt
+
+GSI2: tenantId-messageId-index (for linking to conversations)
+  - PK: tenantId
+  - SK: messageId
+```
+
+#### Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| **tenantId** | String | Yes | Retailer/tenant ID |
+| **customerId** | String | Yes | Customer ID |
+| **mediaId** | String | Yes | Unique media ID (ULID) |
+| **direction** | String | Yes | `inbound` or `outbound` |
+| **source** | String | Yes | `customer`, `library`, `staff_upload` |
+| **mediaLibraryAssetId** | String | Conditional | If source = `library`, reference to TWC_MEDIA_ASSET |
+| **s3Key** | String | Conditional | If source != `library`, S3 storage key |
+| **fileName** | String | Yes | Original file name |
+| **mimeType** | String | Yes | MIME type |
+| **fileSize** | Number | Yes | File size in bytes |
+| **channel** | String | Yes | `whatsapp`, `sms`, `email` |
+| **messageId** | String | No | Link to conversation/message |
+| **conversationId** | String | No | Link to conversation thread |
+| **tags** | List<String> | No | User-defined tags (e.g., "waiver", "quote", "id-document") |
+| **documentType** | String | No | Predefined type: `waiver`, `quote`, `lookbook`, `id`, `other` |
+| **notes** | String | No | Staff notes about this media |
+| **sentBy** | String | Conditional | Staff ID (for outbound) |
+| **receivedAt** | String | Conditional | Timestamp (for inbound) |
+| **createdAt** | String | Yes | Record creation timestamp |
+
+#### Document Types (Predefined)
+
+| Value | Description |
+|-------|-------------|
+| `waiver` | Waiver forms (sent or signed) |
+| `quote` | Price quotes, proposals |
+| `lookbook` | Personalised lookbooks |
+| `id` | ID documents, verification |
+| `receipt` | Receipts, invoices |
+| `other` | Uncategorised |
+
+---
+
+### S3 Structure (Customer Media)
+
+```
+twc-media-{env}/
+├── {tenantId}/
+│   ├── assets/                    # Shared library (existing)
+│   │   └── {assetId}/
+│   │       └── ...
+│   └── customers/                 # Customer-specific media (NEW)
+│       └── {customerId}/
+│           ├── inbound/
+│           │   ├── {mediaId}.jpg
+│           │   └── {mediaId}.pdf
+│           └── outbound/
+│               ├── {mediaId}.pdf   # Customised only
+│               └── ...
+```
+
+**Note:** Outbound from library assets are NOT stored here - only a reference in DynamoDB.
+
+---
+
+### Customer Media API
+
+Base URL: `/api/v1/customers/{customerId}/media`
+
+#### 1. List Customer Media
+
+```http
+GET /api/v1/customers/{customerId}/media?direction=inbound&documentType=waiver&limit=20
+```
+
+**Query Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| direction | String | `inbound`, `outbound`, or omit for all |
+| documentType | String | Filter by document type |
+| channel | String | Filter by channel |
+| tags | String | Comma-separated tags |
+| limit | Number | Page size (default: 20) |
+| cursor | String | Pagination cursor |
+
+**Response:**
+```json
+{
+  "items": [
+    {
+      "mediaId": "01HQABC...",
+      "direction": "inbound",
+      "source": "customer",
+      "fileName": "signed_waiver.pdf",
+      "mimeType": "application/pdf",
+      "fileSize": 125000,
+      "documentType": "waiver",
+      "tags": ["signed", "treatment"],
+      "channel": "whatsapp",
+      "receivedAt": "2025-03-15T10:30:00Z",
+      "thumbnailUrl": "https://presigned..."
+    },
+    {
+      "mediaId": "01HQDEF...",
+      "direction": "outbound",
+      "source": "library",
+      "mediaLibraryAssetId": "01HQXYZ...",
+      "fileName": "Waiver_Form.pdf",
+      "documentType": "waiver",
+      "channel": "whatsapp",
+      "sentBy": "user_123",
+      "createdAt": "2025-03-10T09:00:00Z",
+      "thumbnailUrl": "https://presigned..."
+    }
+  ],
+  "nextCursor": "..."
+}
+```
+
+#### 2. Get Customer Media Detail
+
+```http
+GET /api/v1/customers/{customerId}/media/{mediaId}
+```
+
+**Response:**
+```json
+{
+  "mediaId": "01HQABC...",
+  "direction": "inbound",
+  "source": "customer",
+  "fileName": "signed_waiver.pdf",
+  "mimeType": "application/pdf",
+  "fileSize": 125000,
+  "documentType": "waiver",
+  "tags": ["signed", "treatment"],
+  "notes": "Customer signed in-store on Mar 15",
+  "channel": "whatsapp",
+  "messageId": "msg_456",
+  "conversationId": "conv_789",
+  "receivedAt": "2025-03-15T10:30:00Z",
+  "url": "https://presigned-download-url...",
+  "expiresIn": 3600
+}
+```
+
+#### 3. Upload Customer Media (Staff Upload)
+
+For staff uploading customised content (lookbooks, quotes) directly to a customer.
+
+```http
+POST /api/v1/customers/{customerId}/media/upload-url
+```
+
+**Request:**
+```json
+{
+  "fileName": "Sarah_Lookbook_March.pdf",
+  "mimeType": "application/pdf",
+  "fileSize": 2500000,
+  "documentType": "lookbook"
+}
+```
+
+**Response:**
+```json
+{
+  "uploadId": "upload_xyz",
+  "uploadUrl": "https://s3-presigned...",
+  "expiresIn": 3600
+}
+```
+
+#### 4. Create Customer Media Record
+
+After upload completes:
+
+```http
+POST /api/v1/customers/{customerId}/media
+```
+
+**Request:**
+```json
+{
+  "uploadId": "upload_xyz",
+  "direction": "outbound",
+  "documentType": "lookbook",
+  "tags": ["personalised", "march-2025"],
+  "notes": "Created for Sarah's spring wardrobe refresh"
+}
+```
+
+#### 5. Auto-Capture from Messages (Internal)
+
+When media is sent/received in conversations, the outreach service calls:
+
+```http
+POST /api/v1/customers/{customerId}/media/capture
+```
+
+**Request (Inbound):**
+```json
+{
+  "direction": "inbound",
+  "source": "customer",
+  "channel": "whatsapp",
+  "messageId": "msg_456",
+  "conversationId": "conv_789",
+  "s3Key": "tenants/tenant123/customers/cust456/inbound/abc123.jpg",
+  "fileName": "photo.jpg",
+  "mimeType": "image/jpeg",
+  "fileSize": 150000
+}
+```
+
+**Request (Outbound from Library):**
+```json
+{
+  "direction": "outbound",
+  "source": "library",
+  "mediaLibraryAssetId": "01HQXYZ...",
+  "channel": "whatsapp",
+  "messageId": "msg_457",
+  "sentBy": "user_123"
+}
+```
+
+#### 6. Update Customer Media
+
+```http
+PUT /api/v1/customers/{customerId}/media/{mediaId}
+```
+
+**Request:**
+```json
+{
+  "tags": ["signed", "verified"],
+  "documentType": "waiver",
+  "notes": "Verified by Jane on Mar 16"
+}
+```
+
+#### 7. Delete Customer Media
+
+```http
+DELETE /api/v1/customers/{customerId}/media/{mediaId}
+```
+
+Soft delete - removes from UI but retains for compliance.
+
+---
+
+### Customer Profile UI - Media Tab
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Sarah Chen                                              ⭐ VIP Customer │
+│  sarah.chen@email.com | +61 412 345 678                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│  [Orders]  [Wishlist]  [Notes]  [Messages]  [Media]                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  [📥 Received]  [📤 Sent]  [All]              [+ Upload]  🔍 Search    │
+│                                                                         │
+│  Filter: [All Types ▼]  [All Channels ▼]  Tags: [waiver ×] [+ Add]    │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                                                                  │   │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │   │
+│  │  │  📄      │  │  🖼️      │  │  📄      │  │  📄      │        │   │
+│  │  │          │  │          │  │          │  │          │        │   │
+│  │  │ Signed   │  │ Product  │  │ Waiver   │  │ Quote    │        │   │
+│  │  │ Waiver   │  │ Photo    │  │ Form     │  │ v2       │        │   │
+│  │  │          │  │          │  │          │  │          │        │   │
+│  │  │ Mar 15   │  │ Mar 12   │  │ Mar 10   │  │ Mar 8    │        │   │
+│  │  │ 📥 In    │  │ 📥 In    │  │ 📤 Out   │  │ 📤 Out   │        │   │
+│  │  │ WhatsApp │  │ WhatsApp │  │ WhatsApp │  │ Email    │        │   │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │   │
+│  │                                                                  │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  Showing 1-12 of 24                              [< Prev] [Next >]     │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Media Detail Modal (Customer Media)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Signed Waiver                                                    [×]   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌────────────────────────────────┐  Direction: 📥 Received            │
+│  │                                │  Channel: WhatsApp                  │
+│  │                                │  Received: Mar 15, 2025 10:30 AM    │
+│  │      [PDF Preview]             │  Type: Waiver                       │
+│  │                                │  File: signed_waiver.pdf (125 KB)   │
+│  │                                │                                     │
+│  │                                │  Tags: [signed] [treatment] [+]     │
+│  └────────────────────────────────┘                                     │
+│                                                                         │
+│  Notes                                                                  │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │ Customer signed in-store on Mar 15. Verified ID.                │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  Linked Conversation                                                    │
+│  └─▶ View in Messages                                                  │
+│                                                                         │
+│                                      [Download]  [Delete]  [Save]      │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Next Steps
 
 1. **Confirm data model** - Review fields, add/remove as needed
@@ -801,3 +1158,5 @@ When sending via WhatsApp, the outreach service must:
 4. **Build React components** - Upload, List, Detail views
 5. **Set up Lambda** - Variant generation
 6. **Integrate with outreach** - Media picker component
+7. **Build customer media capture** - Auto-save from message flow
+8. **Build customer profile media tab** - View/manage customer media

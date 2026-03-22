@@ -375,9 +375,192 @@ As a backoffice user, I want to see how often media assets are used in messages,
 
 ---
 
+### Phase 1: Customer Media
+
+#### ML-021: Set up TWC_CUSTOMER_MEDIA DynamoDB table
+**Type:** Task
+**Priority:** High
+**Story Points:** 2
+
+**Description:**
+Create DynamoDB table for storing customer-specific media (inbound, outbound customised).
+
+**Acceptance Criteria:**
+- [ ] Table created with tenantId (PK), customerId#mediaId (SK)
+- [ ] GSI1: tenantId + customerId#createdAt (for customer timeline)
+- [ ] GSI2: tenantId + messageId (for conversation linking)
+- [ ] Terraform/CloudFormation scripts committed
+
+---
+
+#### ML-022: Implement customer media capture API (internal)
+**Type:** Story
+**Priority:** High
+**Story Points:** 5
+
+**Description:**
+As the outreach service, I need to automatically capture media sent/received in customer conversations.
+
+**Acceptance Criteria:**
+- [ ] `POST /api/v1/customers/{customerId}/media/capture` endpoint
+- [ ] Handles inbound: stores file in S3, creates record
+- [ ] Handles outbound from library: stores reference only (no S3 copy)
+- [ ] Handles outbound customised: stores file in S3, creates record
+- [ ] Links to messageId and conversationId
+- [ ] Auto-generates thumbnail for images
+- [ ] Returns mediaId for confirmation
+
+---
+
+#### ML-023: Implement customer media list API
+**Type:** Story
+**Priority:** High
+**Story Points:** 3
+
+**Description:**
+As a staff member, I need to list all media associated with a customer.
+
+**Acceptance Criteria:**
+- [ ] `GET /api/v1/customers/{customerId}/media` endpoint
+- [ ] Filter by direction (inbound/outbound)
+- [ ] Filter by documentType (waiver, quote, lookbook, etc.)
+- [ ] Filter by tags
+- [ ] Filter by channel
+- [ ] Paginated results with cursor
+- [ ] Returns thumbnail URLs
+
+---
+
+#### ML-024: Implement customer media detail/download API
+**Type:** Story
+**Priority:** High
+**Story Points:** 2
+
+**Description:**
+As a staff member, I need to view and download individual customer media items.
+
+**Acceptance Criteria:**
+- [ ] `GET /api/v1/customers/{customerId}/media/{mediaId}` endpoint
+- [ ] Returns full metadata including notes, tags
+- [ ] Returns presigned download URL
+- [ ] For library references, fetches URL from library asset
+- [ ] Returns linked conversation info
+
+---
+
+#### ML-025: Implement customer media upload API (staff upload)
+**Type:** Story
+**Priority:** Medium
+**Story Points:** 3
+
+**Description:**
+As a staff member, I want to upload customised content (lookbooks, quotes) directly to a customer's profile.
+
+**Acceptance Criteria:**
+- [ ] `POST /api/v1/customers/{customerId}/media/upload-url` endpoint
+- [ ] `POST /api/v1/customers/{customerId}/media` to create record
+- [ ] Validates file size (10 MB max)
+- [ ] Accepts documentType, tags, notes
+- [ ] Stores in S3 under customer path
+- [ ] Creates thumbnail
+
+---
+
+#### ML-026: Implement customer media update/tag API
+**Type:** Story
+**Priority:** Medium
+**Story Points:** 2
+
+**Description:**
+As a staff member, I want to add tags and notes to customer media for organisation.
+
+**Acceptance Criteria:**
+- [ ] `PUT /api/v1/customers/{customerId}/media/{mediaId}` endpoint
+- [ ] Can update tags, notes, documentType
+- [ ] Validates documentType against allowed values
+- [ ] Updates updatedAt timestamp
+
+---
+
+#### ML-027: Build customer profile Media tab
+**Type:** Story
+**Priority:** High
+**Story Points:** 8
+
+**Description:**
+As a staff member viewing a customer profile, I want to see all media exchanged with that customer.
+
+**Acceptance Criteria:**
+- [ ] Add "Media" tab to customer profile
+- [ ] Grid/list view with thumbnails
+- [ ] Direction filter (Received / Sent / All)
+- [ ] Document type filter dropdown
+- [ ] Tag filter chips
+- [ ] Channel indicator (WhatsApp, SMS, Email icons)
+- [ ] Pagination
+- [ ] Click opens detail modal
+
+---
+
+#### ML-028: Build customer media detail modal
+**Type:** Story
+**Priority:** High
+**Story Points:** 5
+
+**Description:**
+As a staff member, I want to view media details and add notes/tags.
+
+**Acceptance Criteria:**
+- [ ] Modal shows full preview (image or PDF viewer)
+- [ ] Display metadata: direction, channel, date, file info
+- [ ] Editable tags (add/remove)
+- [ ] Editable document type dropdown
+- [ ] Notes text field (editable)
+- [ ] Link to view in conversation
+- [ ] Download button
+- [ ] Delete button (soft delete)
+
+---
+
+#### ML-029: Build customer media upload modal
+**Type:** Story
+**Priority:** Medium
+**Story Points:** 5
+
+**Description:**
+As a staff member, I want to upload customised content to a customer's profile (e.g., personalised lookbook, custom quote).
+
+**Acceptance Criteria:**
+- [ ] "Upload" button in customer media tab
+- [ ] File picker with drag & drop
+- [ ] Document type selector
+- [ ] Tags input
+- [ ] Notes field
+- [ ] Direct S3 upload with progress
+- [ ] Refresh list on success
+
+---
+
+#### ML-030: Integrate media capture in outreach service
+**Type:** Story
+**Priority:** High
+**Story Points:** 5
+
+**Description:**
+As the outreach service, when media is sent or received in a conversation, automatically capture it to customer media.
+
+**Acceptance Criteria:**
+- [ ] On inbound message with media: call capture API
+- [ ] On outbound with library asset: call capture API with reference
+- [ ] On outbound with ad-hoc upload: call capture API with file
+- [ ] Handle failures gracefully (don't block message)
+- [ ] Log capture success/failure
+
+---
+
 ## Phase 2 (Future)
 
-### ML-020: Auto-generate variants from original
+### ML-031: Auto-generate variants from original
 **Type:** Story
 **Priority:** Low
 **Story Points:** 13
@@ -405,22 +588,26 @@ As a backoffice user, I want to upload a single high-quality original and have S
 | Backoffice UI | ML-012 to ML-015 | 21 |
 | Front-Office | ML-016, ML-017 | 13 |
 | Quality | ML-018, ML-019 | 6 |
-| **Phase 1 Total** | **19 stories** | **~70 points** |
-| Phase 2 | ML-020 | 13 |
+| Customer Media Infra | ML-021 | 2 |
+| Customer Media APIs | ML-022 to ML-026 | 15 |
+| Customer Media UI | ML-027 to ML-029 | 18 |
+| Outreach Integration | ML-030 | 5 |
+| **Phase 1 Total** | **30 stories** | **~110 points** |
+| Phase 2 | ML-031 | 13 |
 
 ---
 
 ## Suggested Sprint Breakdown
 
 ### Sprint 1: Foundation (Infrastructure + Core APIs)
-- ML-001: DynamoDB tables
+- ML-001: DynamoDB tables (shared library)
 - ML-002: S3 bucket
 - ML-003: Presigned URL API
 - ML-004: Create Asset API
 - ML-005: List Assets API
 - ML-006: Get Asset Detail API
 
-### Sprint 2: Complete APIs + Start UI
+### Sprint 2: Complete Library APIs + Start UI
 - ML-007: Update Asset API
 - ML-008: Delete/Archive API
 - ML-009: Version Upload API
@@ -428,14 +615,28 @@ As a backoffice user, I want to upload a single high-quality original and have S
 - ML-011: Category CRUD APIs
 - ML-012: Media Library List page (start)
 
-### Sprint 3: Backoffice UI
+### Sprint 3: Library Backoffice UI
 - ML-012: Media Library List page (complete)
 - ML-013: Upload Media modal
 - ML-014: Asset Detail panel
 - ML-015: Category Management tab
 
-### Sprint 4: Front-Office Integration + Polish
+### Sprint 4: Front-Office Integration
 - ML-016: Media Picker component
 - ML-017: WhatsApp media upload integration
 - ML-018: Expired asset handling
 - ML-019: Usage tracking
+
+### Sprint 5: Customer Media Backend
+- ML-021: Customer media DynamoDB table
+- ML-022: Customer media capture API
+- ML-023: Customer media list API
+- ML-024: Customer media detail API
+- ML-025: Customer media upload API
+- ML-026: Customer media update/tag API
+
+### Sprint 6: Customer Media Frontend + Integration
+- ML-027: Customer profile Media tab
+- ML-028: Customer media detail modal
+- ML-029: Customer media upload modal
+- ML-030: Outreach service integration
