@@ -528,6 +528,1814 @@ Returns 400 if category is in use by assets or is a default category.
 
 ---
 
+## Supported Media Types
+
+### Images
+
+| Format | MIME Type | Max Size | Notes |
+|--------|-----------|----------|-------|
+| JPEG | `image/jpeg` | 10 MB | Universal support |
+| PNG | `image/png` | 10 MB | Supports transparency |
+| GIF | `image/gif` | 5 MB | Animated supported; WhatsApp sends as video |
+| WebP | `image/webp` | 10 MB | Convert to JPEG for email compatibility |
+| HEIC | `image/heic` | 10 MB | iPhone format; auto-convert to JPEG on upload |
+
+### Documents
+
+| Format | MIME Type | Max Size | Notes |
+|--------|-----------|----------|-------|
+| PDF | `application/pdf` | 25 MB | Universal support |
+| DOCX | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | 25 MB | Word documents |
+| XLSX | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | 25 MB | Excel spreadsheets |
+| CSV | `text/csv` | 10 MB | Data files |
+
+### Video
+
+| Format | MIME Type | Max Size | Notes |
+|--------|-----------|----------|-------|
+| MP4 | `video/mp4` | 100 MB | H.264 codec preferred |
+| MOV | `video/quicktime` | 100 MB | iPhone format; convert to MP4 |
+| WebM | `video/webm` | 100 MB | Web-optimized |
+
+---
+
+### Channel Compatibility Matrix
+
+| Type | SMS/MMS | WhatsApp | Email | Notes |
+|------|---------|----------|-------|-------|
+| **JPEG** | ✅ ≤1.2MB | ✅ ≤5MB | ✅ ≤10MB | Universal |
+| **PNG** | ✅ ≤1.2MB | ✅ ≤5MB | ✅ ≤10MB | Universal |
+| **GIF** | ✅ ≤1.2MB | ⚠️ Converts to video | ✅ ≤5MB | WhatsApp sends as MP4 |
+| **WebP** | ❌ | ✅ ≤5MB | ⚠️ Limited | Convert to JPEG for SMS/email |
+| **HEIC** | ❌ | ❌ | ❌ | Always convert to JPEG |
+| **PDF** | ✅ ≤1.2MB | ❌ | ✅ ≤25MB | WhatsApp doesn't support |
+| **DOCX** | ❌ | ✅ ≤16MB | ✅ ≤25MB | No MMS support |
+| **XLSX** | ❌ | ✅ ≤16MB | ✅ ≤25MB | No MMS support |
+| **CSV** | ❌ | ✅ ≤16MB | ✅ ≤10MB | No MMS support |
+| **MP4** | ⚠️ ≤600KB | ✅ ≤16MB | ✅ ≤25MB | MMS very limited |
+| **MOV** | ❌ | ❌ | ⚠️ | Convert to MP4 |
+| **WebM** | ❌ | ❌ | ⚠️ | Convert to MP4 |
+
+**Legend:** ✅ Supported | ⚠️ Limited/Converted | ❌ Not supported
+
+---
+
+### Processing Pipeline
+
+Some formats require server-side processing before storage:
+
+| Input Format | Processing | Output |
+|--------------|------------|--------|
+| HEIC | Convert to JPEG | JPEG (original preserved) |
+| MOV | Transcode to MP4 | MP4 (H.264) |
+| WebM | Transcode to MP4 | MP4 (H.264) |
+| GIF (for WhatsApp) | Convert to MP4 | MP4 loop |
+| Large images | Generate thumbnail | 200x200 JPEG |
+| Video | Generate thumbnail | First frame JPEG |
+| PDF | Generate thumbnail | First page as JPEG |
+
+**Implementation:** Lambda functions triggered on S3 upload:
+- **Images:** Sharp (Node.js) or Pillow (Python)
+- **Video:** FFmpeg via Lambda layer or ECS task
+- **PDF thumbnails:** pdf-lib or Ghostscript
+
+---
+
+### Storage Considerations
+
+| Type | Lifecycle | Rationale |
+|------|-----------|-----------|
+| Images | Standard | Frequently accessed |
+| Documents | Standard | Frequently accessed |
+| Video (original) | Intelligent-Tiering | Large files, variable access |
+| Video (transcoded) | Standard | Delivery copies |
+| Thumbnails | Standard | Always needed for UI |
+| Archived assets | Glacier | Cost optimization |
+
+---
+
+## Media Processing Architecture
+
+### Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              UPLOAD FLOW                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  ┌──────────┐      ┌──────────┐      ┌──────────────────┐
+  │  Client  │─────▶│  API     │─────▶│  S3 (uploads/)   │
+  │  Upload  │      │  Server  │      │  Presigned URL   │
+  └──────────┘      └──────────┘      └────────┬─────────┘
+                                               │
+                                               │ S3 Event
+                                               ▼
+                    ┌──────────────────────────────────────────────────────┐
+                    │                   EventBridge                         │
+                    │              (routes by file type)                    │
+                    └───────┬──────────────┬──────────────┬────────────────┘
+                            │              │              │
+              ┌─────────────▼──┐    ┌──────▼──────┐    ┌──▼───────────────┐
+              │  Image Lambda  │    │  Doc Lambda │    │  Video Queue     │
+              │  (Sharp)       │    │  (pdf-lib)  │    │  (SQS)           │
+              └───────┬────────┘    └──────┬──────┘    └────────┬─────────┘
+                      │                    │                    │
+                      │                    │                    ▼
+                      │                    │           ┌────────────────────┐
+                      │                    │           │  ECS Fargate Task  │
+                      │                    │           │  (FFmpeg)          │
+                      │                    │           └─────────┬──────────┘
+                      │                    │                     │
+                      ▼                    ▼                     ▼
+              ┌────────────────────────────────────────────────────────────┐
+              │                    S3 (processed/)                          │
+              │         Thumbnails, Converted Files, Variants              │
+              └──────────────────────────┬─────────────────────────────────┘
+                                         │
+                                         ▼
+                              ┌─────────────────────┐
+                              │  DynamoDB Update    │
+                              │  status: 'active'   │
+                              └─────────────────────┘
+```
+
+---
+
+### S3 Bucket Structure
+
+```
+twc-media-{env}/
+├── uploads/                          # Raw uploads (temporary)
+│   └── {uploadId}/
+│       └── original.{ext}
+│
+├── {tenantId}/                       # Processed assets
+│   └── assets/
+│       └── {assetId}/
+│           └── v{version}/
+│               ├── original.{ext}    # Original (possibly converted)
+│               ├── thumbnail.jpg     # 200x200 preview
+│               ├── sms.jpg           # Channel variants
+│               ├── whatsapp.jpg
+│               ├── email.{ext}
+│               └── converted.mp4     # If video was transcoded
+│
+└── customers/                        # Customer-specific media
+    └── {customerId}/
+        └── ...
+```
+
+---
+
+### Lambda Functions
+
+#### 1. Media Router (Entry Point)
+
+Triggered by S3 `ObjectCreated` events on `uploads/` prefix.
+
+```
+Function: twc-media-router
+Runtime: Node.js 20.x
+Memory: 256 MB
+Timeout: 30 seconds
+Trigger: S3 ObjectCreated (uploads/*)
+```
+
+**Logic:**
+```javascript
+exports.handler = async (event) => {
+  const { bucket, key } = parseS3Event(event);
+  const mimeType = await detectMimeType(bucket, key);
+  const uploadId = extractUploadId(key);
+
+  // Route to appropriate processor
+  if (isImage(mimeType)) {
+    await invokeLambda('twc-media-image-processor', { bucket, key, uploadId });
+  } else if (isDocument(mimeType)) {
+    await invokeLambda('twc-media-doc-processor', { bucket, key, uploadId });
+  } else if (isVideo(mimeType)) {
+    await sendToSQS('twc-media-video-queue', { bucket, key, uploadId });
+  } else {
+    await handleUnsupportedType(uploadId, mimeType);
+  }
+};
+```
+
+---
+
+#### 2. Image Processor
+
+Handles JPEG, PNG, GIF, WebP, HEIC.
+
+```
+Function: twc-media-image-processor
+Runtime: Node.js 20.x
+Memory: 1024 MB (Sharp needs memory for large images)
+Timeout: 60 seconds
+Layers: Sharp layer
+```
+
+**Processing Steps:**
+
+| Input | Output | Processing |
+|-------|--------|------------|
+| HEIC | JPEG | Convert using Sharp |
+| Any image | thumbnail.jpg | Resize to 200x200, cover crop |
+| Large image | sms.jpg | Resize to max 600px, compress to <1MB |
+| Large image | whatsapp.jpg | Resize to max 1200px, compress to <5MB |
+| Large image | email.jpg | Resize to max 1600px, quality 85% |
+| Original | original.{ext} | Copy (or converted JPEG for HEIC) |
+
+**Code:**
+```javascript
+const sharp = require('sharp');
+
+async function processImage(bucket, key, uploadId, assetId, tenantId) {
+  const input = await s3.getObject({ Bucket: bucket, Key: key });
+  let image = sharp(input.Body);
+  const metadata = await image.metadata();
+
+  const outputs = [];
+
+  // Convert HEIC to JPEG
+  if (metadata.format === 'heif') {
+    image = image.jpeg({ quality: 90 });
+  }
+
+  // Generate thumbnail
+  outputs.push({
+    key: `${tenantId}/assets/${assetId}/v1/thumbnail.jpg`,
+    buffer: await image.clone()
+      .resize(200, 200, { fit: 'cover' })
+      .jpeg({ quality: 80 })
+      .toBuffer()
+  });
+
+  // Generate SMS variant (max 1.2MB, max 600px)
+  outputs.push({
+    key: `${tenantId}/assets/${assetId}/v1/sms.jpg`,
+    buffer: await image.clone()
+      .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 70 })
+      .toBuffer()
+  });
+
+  // Generate WhatsApp variant (max 5MB, max 1200px)
+  outputs.push({
+    key: `${tenantId}/assets/${assetId}/v1/whatsapp.jpg`,
+    buffer: await image.clone()
+      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer()
+  });
+
+  // Generate email variant (max 10MB, max 1600px)
+  outputs.push({
+    key: `${tenantId}/assets/${assetId}/v1/email.jpg`,
+    buffer: await image.clone()
+      .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer()
+  });
+
+  // Save original (converted if HEIC)
+  outputs.push({
+    key: `${tenantId}/assets/${assetId}/v1/original.${metadata.format === 'heif' ? 'jpg' : metadata.format}`,
+    buffer: await image.toBuffer()
+  });
+
+  // Upload all outputs to S3
+  await Promise.all(outputs.map(o =>
+    s3.putObject({ Bucket: bucket, Key: o.key, Body: o.buffer })
+  ));
+
+  // Update DynamoDB
+  await updateAssetStatus(assetId, 'active', outputs);
+
+  // Cleanup upload
+  await s3.deleteObject({ Bucket: bucket, Key: key });
+}
+```
+
+---
+
+#### 3. Document Processor
+
+Handles PDF, DOCX, XLSX, CSV.
+
+```
+Function: twc-media-doc-processor
+Runtime: Node.js 20.x
+Memory: 512 MB
+Timeout: 60 seconds
+Layers: pdf-lib, LibreOffice (for DOCX/XLSX thumbnails)
+```
+
+**Processing Steps:**
+
+| Input | Output | Processing |
+|-------|--------|------------|
+| PDF | thumbnail.jpg | Render first page using pdf-lib + canvas |
+| DOCX/XLSX | thumbnail.jpg | Convert to PDF first, then render |
+| Any doc | original.{ext} | Copy unchanged |
+
+**Note:** DOCX/XLSX thumbnail generation is complex. Options:
+1. **LibreOffice Lambda Layer** - Heavy (~300MB) but accurate
+2. **External service** - CloudConvert, Zamzar API
+3. **Generic icon** - Show file type icon instead of preview
+
+**Recommended:** Use generic icons for Phase 1, add LibreOffice in Phase 2.
+
+```javascript
+async function processDocument(bucket, key, uploadId, assetId, tenantId) {
+  const ext = path.extname(key).toLowerCase();
+  const outputs = [];
+
+  if (ext === '.pdf') {
+    // Generate PDF thumbnail
+    const pdfBuffer = await s3.getObject({ Bucket: bucket, Key: key });
+    const thumbnail = await generatePdfThumbnail(pdfBuffer.Body);
+    outputs.push({
+      key: `${tenantId}/assets/${assetId}/v1/thumbnail.jpg`,
+      buffer: thumbnail
+    });
+  } else {
+    // DOCX, XLSX, CSV - use generic icon for now
+    outputs.push({
+      key: `${tenantId}/assets/${assetId}/v1/thumbnail.jpg`,
+      buffer: await getGenericIcon(ext)
+    });
+  }
+
+  // Copy original
+  await s3.copyObject({
+    CopySource: `${bucket}/${key}`,
+    Bucket: bucket,
+    Key: `${tenantId}/assets/${assetId}/v1/original${ext}`
+  });
+
+  await updateAssetStatus(assetId, 'active', outputs);
+  await s3.deleteObject({ Bucket: bucket, Key: key });
+}
+```
+
+---
+
+#### 4. Video Processor (ECS Fargate)
+
+Videos are too large and slow for Lambda. Use ECS Fargate with FFmpeg.
+
+```
+Queue: twc-media-video-queue (SQS)
+Task: twc-media-video-processor
+CPU: 1 vCPU
+Memory: 2 GB
+Container: Custom with FFmpeg
+Timeout: 30 minutes
+```
+
+**Processing Steps:**
+
+| Input | Output | Processing |
+|-------|--------|------------|
+| MOV | MP4 | Transcode H.264, AAC audio |
+| WebM | MP4 | Transcode H.264, AAC audio |
+| MP4 | MP4 | Copy or re-encode if needed |
+| Any video | thumbnail.jpg | Extract frame at 1 second |
+| Any video | whatsapp.mp4 | Compress to <16MB |
+| Any video | email.mp4 | Compress to <25MB |
+
+**ECS Task Definition:**
+```json
+{
+  "family": "twc-media-video-processor",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "containerDefinitions": [{
+    "name": "ffmpeg",
+    "image": "your-ecr/twc-media-ffmpeg:latest",
+    "environment": [
+      { "name": "S3_BUCKET", "value": "twc-media-prod" }
+    ],
+    "logConfiguration": {
+      "logDriver": "awslogs",
+      "options": {
+        "awslogs-group": "/ecs/twc-media-video",
+        "awslogs-region": "ap-southeast-2",
+        "awslogs-stream-prefix": "video"
+      }
+    }
+  }]
+}
+```
+
+**FFmpeg Commands:**
+
+```bash
+# Generate thumbnail (first frame at 1 second)
+ffmpeg -i input.mov -ss 00:00:01 -vframes 1 -vf "scale=200:200:force_original_aspect_ratio=decrease,pad=200:200:(ow-iw)/2:(oh-ih)/2" thumbnail.jpg
+
+# Convert MOV/WebM to MP4
+ffmpeg -i input.mov -c:v libx264 -preset medium -crf 23 -c:a aac -b:a 128k -movflags +faststart output.mp4
+
+# Compress for WhatsApp (<16MB)
+ffmpeg -i input.mp4 -c:v libx264 -preset slow -crf 28 -maxrate 1M -bufsize 2M -c:a aac -b:a 96k -fs 15M whatsapp.mp4
+
+# Compress for SMS (<600KB) - very aggressive
+ffmpeg -i input.mp4 -c:v libx264 -preset slow -crf 35 -maxrate 200k -bufsize 400k -vf "scale=480:-2" -c:a aac -b:a 48k -fs 550K sms.mp4
+```
+
+---
+
+### Processing Status Flow
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  uploading  │────▶│  processing │────▶│   active    │     │   failed    │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+                           │                                       ▲
+                           └───────────────────────────────────────┘
+                                      (on error)
+```
+
+**DynamoDB Status Updates:**
+
+| Status | Set By | Description |
+|--------|--------|-------------|
+| `uploading` | API | Presigned URL generated, waiting for upload |
+| `processing` | Router Lambda | File received, processing started |
+| `active` | Processor | All variants generated, ready for use |
+| `failed` | Processor | Processing failed (with error message) |
+
+---
+
+### Error Handling
+
+#### Retry Strategy
+
+| Component | Retries | Backoff |
+|-----------|---------|---------|
+| Image Lambda | 2 | Exponential |
+| Doc Lambda | 2 | Exponential |
+| Video SQS | 3 | 30s, 60s, 120s |
+| ECS Task | 2 | - |
+
+#### Dead Letter Queue
+
+Failed processing jobs go to `twc-media-dlq` for manual review.
+
+```json
+{
+  "uploadId": "upload_abc123",
+  "assetId": "01HQXYZ...",
+  "tenantId": "retailer-xyz",
+  "error": "FFmpeg exit code 1: Invalid data found when processing input",
+  "attempts": 3,
+  "lastAttempt": "2025-03-20T10:30:00Z"
+}
+```
+
+#### Cleanup
+
+- Failed uploads: Delete from `uploads/` after 24 hours (S3 lifecycle)
+- Orphaned processing: Lambda checks for stale `processing` status hourly
+
+---
+
+### Infrastructure (Terraform)
+
+```hcl
+# S3 Bucket
+resource "aws_s3_bucket" "media" {
+  bucket = "twc-media-${var.environment}"
+}
+
+resource "aws_s3_bucket_notification" "media_upload" {
+  bucket = aws_s3_bucket.media.id
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.media_router.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "uploads/"
+  }
+}
+
+# Image Processor Lambda
+resource "aws_lambda_function" "image_processor" {
+  function_name = "twc-media-image-processor"
+  runtime       = "nodejs20.x"
+  handler       = "index.handler"
+  memory_size   = 1024
+  timeout       = 60
+
+  layers = [
+    "arn:aws:lambda:ap-southeast-2:xxx:layer:sharp:1"
+  ]
+
+  environment {
+    variables = {
+      S3_BUCKET     = aws_s3_bucket.media.id
+      DYNAMODB_TABLE = aws_dynamodb_table.media_asset.name
+    }
+  }
+}
+
+# Video Processing Queue
+resource "aws_sqs_queue" "video_queue" {
+  name                       = "twc-media-video-queue"
+  visibility_timeout_seconds = 1800  # 30 minutes
+  message_retention_seconds  = 86400 # 24 hours
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.dlq.arn
+    maxReceiveCount     = 3
+  })
+}
+
+# ECS Cluster for Video Processing
+resource "aws_ecs_cluster" "media" {
+  name = "twc-media-processing"
+
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
+}
+```
+
+---
+
+### Cost Estimates
+
+| Component | Usage | Monthly Cost (est.) |
+|-----------|-------|---------------------|
+| Lambda (Image) | 10,000 invocations × 5s × 1GB | ~$1 |
+| Lambda (Doc) | 5,000 invocations × 3s × 512MB | ~$0.50 |
+| ECS Fargate (Video) | 500 tasks × 5min × 1vCPU | ~$5 |
+| S3 Storage | 100 GB | ~$2.50 |
+| S3 Requests | 100,000 | ~$0.50 |
+| SQS | 10,000 messages | ~$0.01 |
+| **Total** | | **~$10/month** |
+
+*Scales linearly with usage. Video processing is the largest cost driver.*
+
+---
+
+### Monitoring & Alerting
+
+#### CloudWatch Dashboards
+
+**Dashboard: TWC Media Processing**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  TWC Media Processing Dashboard                           Last 24 hours ▼  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐                  │
+│  │  Uploads (24h)          │  │  Processing Status      │                  │
+│  │  ████████████ 1,247     │  │  ✅ Success: 1,189 (95%)│                  │
+│  │                         │  │  ⏳ Processing: 23      │                  │
+│  │  Images: 892            │  │  ❌ Failed: 35 (3%)     │                  │
+│  │  Docs: 298              │  │                         │                  │
+│  │  Video: 57              │  │                         │                  │
+│  └─────────────────────────┘  └─────────────────────────┘                  │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Processing Time (p95)                                               │   │
+│  │   8s ┤                                                               │   │
+│  │   6s ┤     ╭───╮                                                     │   │
+│  │   4s ┤ ╭───╯   ╰───╮     ╭───╮                                       │   │
+│  │   2s ┤─╯           ╰─────╯   ╰───────────────────────────            │   │
+│  │   0s ┼─────────────────────────────────────────────────────────      │   │
+│  │      00:00    06:00    12:00    18:00    00:00                       │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌──────────────────────────────┐  ┌──────────────────────────────┐        │
+│  │  Lambda Errors (24h)         │  │  SQS Queue Depth             │        │
+│  │  Image Processor: 2          │  │  Video Queue: 3 messages     │        │
+│  │  Doc Processor: 0            │  │  DLQ: 5 messages ⚠️           │        │
+│  │  Router: 1                   │  │                              │        │
+│  └──────────────────────────────┘  └──────────────────────────────┘        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Metrics
+
+| Metric | Namespace | Dimensions | Description |
+|--------|-----------|------------|-------------|
+| `UploadsTotal` | TWC/Media | TenantId, MediaType | Total uploads |
+| `ProcessingDuration` | TWC/Media | Processor, MediaType | Processing time (ms) |
+| `ProcessingSuccess` | TWC/Media | Processor | Successful processing |
+| `ProcessingFailed` | TWC/Media | Processor, ErrorType | Failed processing |
+| `QueueDepth` | TWC/Media | QueueName | Messages waiting |
+| `StorageUsed` | TWC/Media | TenantId | S3 storage bytes |
+
+**Custom Metrics (Lambda):**
+
+```javascript
+const { MetricUnits, Metrics } = require('@aws-lambda-powertools/metrics');
+
+const metrics = new Metrics({ namespace: 'TWC/Media', serviceName: 'image-processor' });
+
+async function processImage(event) {
+  const startTime = Date.now();
+
+  try {
+    // ... processing logic ...
+
+    metrics.addMetric('ProcessingSuccess', MetricUnits.Count, 1);
+    metrics.addMetric('ProcessingDuration', MetricUnits.Milliseconds, Date.now() - startTime);
+    metrics.addDimension('MediaType', 'image');
+    metrics.addDimension('TenantId', tenantId);
+
+  } catch (error) {
+    metrics.addMetric('ProcessingFailed', MetricUnits.Count, 1);
+    metrics.addDimension('ErrorType', error.name);
+    throw error;
+  } finally {
+    metrics.publishStoredMetrics();
+  }
+}
+```
+
+#### Alarms
+
+| Alarm | Condition | Action |
+|-------|-----------|--------|
+| **HighErrorRate** | ProcessingFailed / Total > 5% over 15min | PagerDuty + Slack |
+| **ProcessingBacklog** | QueueDepth > 100 for 10min | Slack |
+| **DLQNotEmpty** | DLQ messages > 0 for 5min | Slack |
+| **LambdaThrottled** | Throttles > 0 | Slack |
+| **HighProcessingTime** | p95 duration > 30s for 15min | Slack |
+| **ECSTaskFailed** | Task stopped with error | PagerDuty |
+| **StorageQuotaWarning** | TenantStorage > 80% of quota | Email tenant |
+
+**Terraform for Alarms:**
+
+```hcl
+resource "aws_cloudwatch_metric_alarm" "high_error_rate" {
+  alarm_name          = "twc-media-high-error-rate"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  threshold           = 5
+  alarm_description   = "Media processing error rate > 5%"
+
+  metric_query {
+    id          = "error_rate"
+    expression  = "(failed / total) * 100"
+    label       = "Error Rate"
+    return_data = true
+  }
+
+  metric_query {
+    id = "failed"
+    metric {
+      metric_name = "ProcessingFailed"
+      namespace   = "TWC/Media"
+      period      = 300
+      stat        = "Sum"
+    }
+  }
+
+  metric_query {
+    id = "total"
+    metric {
+      metric_name = "UploadsTotal"
+      namespace   = "TWC/Media"
+      period      = 300
+      stat        = "Sum"
+    }
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "dlq_not_empty" {
+  alarm_name          = "twc-media-dlq-not-empty"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 300
+  statistic           = "Average"
+  threshold           = 0
+  alarm_description   = "Dead letter queue has messages"
+
+  dimensions = {
+    QueueName = aws_sqs_queue.dlq.name
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+}
+```
+
+#### Logging
+
+**Structured Logging (Lambda Powertools):**
+
+```javascript
+const { Logger } = require('@aws-lambda-powertools/logger');
+
+const logger = new Logger({
+  serviceName: 'image-processor',
+  logLevel: 'INFO'
+});
+
+async function processImage(event) {
+  const { uploadId, assetId, tenantId } = event;
+
+  logger.appendKeys({ uploadId, assetId, tenantId });
+
+  logger.info('Processing started', {
+    mimeType: event.mimeType,
+    fileSize: event.fileSize
+  });
+
+  try {
+    // ... processing ...
+    logger.info('Processing completed', {
+      variantsGenerated: ['thumbnail', 'sms', 'email'],
+      durationMs: Date.now() - startTime
+    });
+  } catch (error) {
+    logger.error('Processing failed', {
+      error: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+```
+
+**Log Insights Queries:**
+
+```sql
+-- Failed uploads by tenant (last 24h)
+fields @timestamp, tenantId, assetId, @message
+| filter @message like /Processing failed/
+| stats count() as failures by tenantId
+| sort failures desc
+| limit 20
+
+-- Slow processing (>10s)
+fields @timestamp, tenantId, assetId, durationMs
+| filter durationMs > 10000
+| sort durationMs desc
+| limit 50
+
+-- Processing volume by type
+fields @timestamp, mimeType
+| filter @message like /Processing started/
+| stats count() as uploads by mimeType
+| sort uploads desc
+```
+
+#### Alerting Channels
+
+| Severity | Channel | Response Time |
+|----------|---------|---------------|
+| P1 - Critical | PagerDuty | 15 min |
+| P2 - High | Slack #alerts + PagerDuty | 1 hour |
+| P3 - Medium | Slack #alerts | 4 hours |
+| P4 - Low | Email | Next business day |
+
+**SNS Topic Subscriptions:**
+
+```hcl
+resource "aws_sns_topic" "alerts" {
+  name = "twc-media-alerts"
+}
+
+resource "aws_sns_topic_subscription" "pagerduty" {
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "https"
+  endpoint  = "https://events.pagerduty.com/integration/xxx/enqueue"
+}
+
+resource "aws_sns_topic_subscription" "slack" {
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.slack_notifier.arn
+}
+```
+
+---
+
+### Terraform Modules
+
+Complete Terraform configuration for the media processing infrastructure.
+
+#### Directory Structure
+
+```
+terraform/
+├── environments/
+│   ├── dev/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── terraform.tfvars
+│   ├── staging/
+│   └── prod/
+├── modules/
+│   ├── media-storage/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   ├── media-processing/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   └── iam.tf
+│   ├── media-database/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   └── media-monitoring/
+│       ├── main.tf
+│       ├── variables.tf
+│       ├── dashboards.tf
+│       └── alarms.tf
+└── shared/
+    └── ecr/
+        └── main.tf
+```
+
+---
+
+#### Module: media-storage
+
+**modules/media-storage/main.tf**
+
+```hcl
+# S3 Bucket for Media Assets
+resource "aws_s3_bucket" "media" {
+  bucket = "twc-media-${var.environment}"
+
+  tags = {
+    Name        = "TWC Media Storage"
+    Environment = var.environment
+    Project     = "twc-media"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "media" {
+  bucket = aws_s3_bucket.media.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "media" {
+  bucket = aws_s3_bucket.media.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = var.kms_key_arn
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "media" {
+  bucket = aws_s3_bucket.media.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "media" {
+  bucket = aws_s3_bucket.media.id
+
+  # Clean up failed uploads after 24 hours
+  rule {
+    id     = "cleanup-uploads"
+    status = "Enabled"
+
+    filter {
+      prefix = "uploads/"
+    }
+
+    expiration {
+      days = 1
+    }
+  }
+
+  # Move archived assets to Glacier after 90 days
+  rule {
+    id     = "archive-old-assets"
+    status = "Enabled"
+
+    filter {
+      and {
+        prefix = ""
+        tags = {
+          status = "archived"
+        }
+      }
+    }
+
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
+    }
+  }
+
+  # Move video originals to Intelligent-Tiering
+  rule {
+    id     = "video-tiering"
+    status = "Enabled"
+
+    filter {
+      prefix = ""
+    }
+
+    transition {
+      days          = 30
+      storage_class = "INTELLIGENT_TIERING"
+    }
+
+    # Only apply to large files (videos)
+    filter {
+      object_size_greater_than = 10485760  # 10MB
+    }
+  }
+}
+
+resource "aws_s3_bucket_cors_configuration" "media" {
+  bucket = aws_s3_bucket.media.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["GET", "PUT", "POST"]
+    allowed_origins = var.cors_origins
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3600
+  }
+}
+
+# S3 Event Notification to EventBridge
+resource "aws_s3_bucket_notification" "media" {
+  bucket      = aws_s3_bucket.media.id
+  eventbridge = true
+}
+```
+
+**modules/media-storage/variables.tf**
+
+```hcl
+variable "environment" {
+  description = "Environment name (dev, staging, prod)"
+  type        = string
+}
+
+variable "kms_key_arn" {
+  description = "KMS key ARN for S3 encryption"
+  type        = string
+}
+
+variable "cors_origins" {
+  description = "Allowed CORS origins"
+  type        = list(string)
+  default     = ["https://*.twc.com"]
+}
+```
+
+**modules/media-storage/outputs.tf**
+
+```hcl
+output "bucket_name" {
+  value = aws_s3_bucket.media.id
+}
+
+output "bucket_arn" {
+  value = aws_s3_bucket.media.arn
+}
+
+output "bucket_regional_domain" {
+  value = aws_s3_bucket.media.bucket_regional_domain_name
+}
+```
+
+---
+
+#### Module: media-processing
+
+**modules/media-processing/main.tf**
+
+```hcl
+# Lambda: Media Router
+resource "aws_lambda_function" "router" {
+  function_name = "twc-media-router-${var.environment}"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "index.handler"
+  runtime       = "nodejs20.x"
+  timeout       = 30
+  memory_size   = 256
+
+  filename         = var.router_zip_path
+  source_code_hash = filebase64sha256(var.router_zip_path)
+
+  environment {
+    variables = {
+      ENVIRONMENT           = var.environment
+      IMAGE_PROCESSOR_ARN   = aws_lambda_function.image_processor.arn
+      DOC_PROCESSOR_ARN     = aws_lambda_function.doc_processor.arn
+      VIDEO_QUEUE_URL       = aws_sqs_queue.video_queue.url
+      DYNAMODB_TABLE        = var.dynamodb_table_name
+    }
+  }
+
+  tracing_config {
+    mode = "Active"
+  }
+
+  tags = var.tags
+}
+
+# Lambda: Image Processor
+resource "aws_lambda_function" "image_processor" {
+  function_name = "twc-media-image-processor-${var.environment}"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "index.handler"
+  runtime       = "nodejs20.x"
+  timeout       = 60
+  memory_size   = 1024
+
+  filename         = var.image_processor_zip_path
+  source_code_hash = filebase64sha256(var.image_processor_zip_path)
+
+  layers = [
+    var.sharp_layer_arn
+  ]
+
+  environment {
+    variables = {
+      ENVIRONMENT    = var.environment
+      S3_BUCKET      = var.s3_bucket_name
+      DYNAMODB_TABLE = var.dynamodb_table_name
+    }
+  }
+
+  tracing_config {
+    mode = "Active"
+  }
+
+  tags = var.tags
+}
+
+# Lambda: Document Processor
+resource "aws_lambda_function" "doc_processor" {
+  function_name = "twc-media-doc-processor-${var.environment}"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "index.handler"
+  runtime       = "nodejs20.x"
+  timeout       = 60
+  memory_size   = 512
+
+  filename         = var.doc_processor_zip_path
+  source_code_hash = filebase64sha256(var.doc_processor_zip_path)
+
+  environment {
+    variables = {
+      ENVIRONMENT    = var.environment
+      S3_BUCKET      = var.s3_bucket_name
+      DYNAMODB_TABLE = var.dynamodb_table_name
+    }
+  }
+
+  tracing_config {
+    mode = "Active"
+  }
+
+  tags = var.tags
+}
+
+# EventBridge Rule: Route S3 uploads to Lambda
+resource "aws_cloudwatch_event_rule" "s3_upload" {
+  name        = "twc-media-upload-${var.environment}"
+  description = "Route S3 media uploads to processing"
+
+  event_pattern = jsonencode({
+    source      = ["aws.s3"]
+    detail-type = ["Object Created"]
+    detail = {
+      bucket = {
+        name = [var.s3_bucket_name]
+      }
+      object = {
+        key = [{
+          prefix = "uploads/"
+        }]
+      }
+    }
+  })
+
+  tags = var.tags
+}
+
+resource "aws_cloudwatch_event_target" "router" {
+  rule      = aws_cloudwatch_event_rule.s3_upload.name
+  target_id = "media-router"
+  arn       = aws_lambda_function.router.arn
+}
+
+resource "aws_lambda_permission" "eventbridge" {
+  statement_id  = "AllowEventBridge"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.router.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.s3_upload.arn
+}
+
+# SQS: Video Processing Queue
+resource "aws_sqs_queue" "video_queue" {
+  name                       = "twc-media-video-${var.environment}"
+  visibility_timeout_seconds = 1800  # 30 minutes
+  message_retention_seconds  = 86400 # 24 hours
+  receive_wait_time_seconds  = 20    # Long polling
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.dlq.arn
+    maxReceiveCount     = 3
+  })
+
+  tags = var.tags
+}
+
+resource "aws_sqs_queue" "dlq" {
+  name                      = "twc-media-dlq-${var.environment}"
+  message_retention_seconds = 1209600  # 14 days
+
+  tags = var.tags
+}
+
+# ECS Cluster for Video Processing
+resource "aws_ecs_cluster" "media" {
+  name = "twc-media-${var.environment}"
+
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
+
+  tags = var.tags
+}
+
+resource "aws_ecs_cluster_capacity_providers" "media" {
+  cluster_name = aws_ecs_cluster.media.name
+
+  capacity_providers = ["FARGATE", "FARGATE_SPOT"]
+
+  default_capacity_provider_strategy {
+    base              = 1
+    weight            = 100
+    capacity_provider = "FARGATE_SPOT"
+  }
+}
+
+# ECS Task Definition: Video Processor
+resource "aws_ecs_task_definition" "video_processor" {
+  family                   = "twc-media-video-${var.environment}"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = 1024
+  memory                   = 2048
+  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "ffmpeg"
+      image     = "${var.ecr_repository_url}:${var.video_processor_image_tag}"
+      essential = true
+
+      environment = [
+        { name = "S3_BUCKET", value = var.s3_bucket_name },
+        { name = "DYNAMODB_TABLE", value = var.dynamodb_table_name },
+        { name = "ENVIRONMENT", value = var.environment }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.video.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "video"
+        }
+      }
+    }
+  ])
+
+  tags = var.tags
+}
+
+# Lambda: SQS to ECS (triggers Fargate tasks)
+resource "aws_lambda_function" "video_trigger" {
+  function_name = "twc-media-video-trigger-${var.environment}"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "index.handler"
+  runtime       = "nodejs20.x"
+  timeout       = 30
+  memory_size   = 256
+
+  filename         = var.video_trigger_zip_path
+  source_code_hash = filebase64sha256(var.video_trigger_zip_path)
+
+  environment {
+    variables = {
+      ECS_CLUSTER         = aws_ecs_cluster.media.arn
+      ECS_TASK_DEFINITION = aws_ecs_task_definition.video_processor.arn
+      ECS_SUBNETS         = join(",", var.private_subnet_ids)
+      ECS_SECURITY_GROUP  = var.ecs_security_group_id
+    }
+  }
+
+  tags = var.tags
+}
+
+resource "aws_lambda_event_source_mapping" "video_queue" {
+  event_source_arn = aws_sqs_queue.video_queue.arn
+  function_name    = aws_lambda_function.video_trigger.arn
+  batch_size       = 1
+}
+
+# CloudWatch Log Groups
+resource "aws_cloudwatch_log_group" "router" {
+  name              = "/aws/lambda/twc-media-router-${var.environment}"
+  retention_in_days = 30
+  tags              = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "image" {
+  name              = "/aws/lambda/twc-media-image-processor-${var.environment}"
+  retention_in_days = 30
+  tags              = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "doc" {
+  name              = "/aws/lambda/twc-media-doc-processor-${var.environment}"
+  retention_in_days = 30
+  tags              = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "video" {
+  name              = "/ecs/twc-media-video-${var.environment}"
+  retention_in_days = 30
+  tags              = var.tags
+}
+```
+
+**modules/media-processing/iam.tf**
+
+```hcl
+# Lambda Execution Role
+resource "aws_iam_role" "lambda_role" {
+  name = "twc-media-lambda-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy" "lambda_policy" {
+  name = "twc-media-lambda-policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:CopyObject"
+        ]
+        Resource = "${var.s3_bucket_arn}/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query"
+        ]
+        Resource = var.dynamodb_table_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.video_queue.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:InvokeFunction"
+        ]
+        Resource = [
+          aws_lambda_function.image_processor.arn,
+          aws_lambda_function.doc_processor.arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecs:RunTask"
+        ]
+        Resource = aws_ecs_task_definition.video_processor.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = [
+          aws_iam_role.ecs_execution_role.arn,
+          aws_iam_role.ecs_task_role.arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricData"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# ECS Execution Role
+resource "aws_iam_role" "ecs_execution_role" {
+  name = "twc-media-ecs-execution-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ecs-tasks.amazonaws.com"
+      }
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_execution" {
+  role       = aws_iam_role.ecs_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# ECS Task Role
+resource "aws_iam_role" "ecs_task_role" {
+  name = "twc-media-ecs-task-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ecs-tasks.amazonaws.com"
+      }
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy" "ecs_task_policy" {
+  name = "twc-media-ecs-task-policy"
+  role = aws_iam_role.ecs_task_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "${var.s3_bucket_arn}/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:UpdateItem"
+        ]
+        Resource = var.dynamodb_table_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricData"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+```
+
+**modules/media-processing/variables.tf**
+
+```hcl
+variable "environment" {
+  type = string
+}
+
+variable "aws_region" {
+  type = string
+}
+
+variable "s3_bucket_name" {
+  type = string
+}
+
+variable "s3_bucket_arn" {
+  type = string
+}
+
+variable "dynamodb_table_name" {
+  type = string
+}
+
+variable "dynamodb_table_arn" {
+  type = string
+}
+
+variable "router_zip_path" {
+  type = string
+}
+
+variable "image_processor_zip_path" {
+  type = string
+}
+
+variable "doc_processor_zip_path" {
+  type = string
+}
+
+variable "video_trigger_zip_path" {
+  type = string
+}
+
+variable "sharp_layer_arn" {
+  type = string
+}
+
+variable "ecr_repository_url" {
+  type = string
+}
+
+variable "video_processor_image_tag" {
+  type    = string
+  default = "latest"
+}
+
+variable "private_subnet_ids" {
+  type = list(string)
+}
+
+variable "ecs_security_group_id" {
+  type = string
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+```
+
+---
+
+#### Module: media-database
+
+**modules/media-database/main.tf**
+
+```hcl
+# DynamoDB: Media Assets
+resource "aws_dynamodb_table" "media_asset" {
+  name         = "TWC_MEDIA_ASSET_${upper(var.environment)}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "tenantId"
+  range_key    = "assetId"
+
+  attribute {
+    name = "tenantId"
+    type = "S"
+  }
+
+  attribute {
+    name = "assetId"
+    type = "S"
+  }
+
+  attribute {
+    name = "category"
+    type = "S"
+  }
+
+  attribute {
+    name = "status"
+    type = "S"
+  }
+
+  attribute {
+    name = "createdAt"
+    type = "S"
+  }
+
+  # GSI: Query by category
+  global_secondary_index {
+    name            = "tenantId-category-index"
+    hash_key        = "tenantId"
+    range_key       = "category"
+    projection_type = "ALL"
+  }
+
+  # GSI: Query by status
+  global_secondary_index {
+    name            = "tenantId-status-index"
+    hash_key        = "tenantId"
+    range_key       = "status"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = var.kms_key_arn
+  }
+
+  tags = var.tags
+}
+
+# DynamoDB: Media Categories
+resource "aws_dynamodb_table" "media_category" {
+  name         = "TWC_MEDIA_CATEGORY_${upper(var.environment)}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "tenantId"
+  range_key    = "categoryId"
+
+  attribute {
+    name = "tenantId"
+    type = "S"
+  }
+
+  attribute {
+    name = "categoryId"
+    type = "S"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = var.kms_key_arn
+  }
+
+  tags = var.tags
+}
+
+# DynamoDB: Media Versions
+resource "aws_dynamodb_table" "media_version" {
+  name         = "TWC_MEDIA_VERSION_${upper(var.environment)}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "tenantAssetId"
+  range_key    = "version"
+
+  attribute {
+    name = "tenantAssetId"
+    type = "S"
+  }
+
+  attribute {
+    name = "version"
+    type = "N"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = var.kms_key_arn
+  }
+
+  tags = var.tags
+}
+
+# DynamoDB: Customer Media
+resource "aws_dynamodb_table" "customer_media" {
+  name         = "TWC_CUSTOMER_MEDIA_${upper(var.environment)}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "tenantId"
+  range_key    = "customerMediaId"
+
+  attribute {
+    name = "tenantId"
+    type = "S"
+  }
+
+  attribute {
+    name = "customerMediaId"
+    type = "S"
+  }
+
+  attribute {
+    name = "customerId"
+    type = "S"
+  }
+
+  attribute {
+    name = "createdAt"
+    type = "S"
+  }
+
+  # GSI: Query by customer
+  global_secondary_index {
+    name            = "tenantId-customerId-index"
+    hash_key        = "tenantId"
+    range_key       = "customerId"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = var.kms_key_arn
+  }
+
+  tags = var.tags
+}
+```
+
+---
+
+#### Environment Configuration
+
+**environments/prod/main.tf**
+
+```hcl
+terraform {
+  required_version = ">= 1.5.0"
+
+  backend "s3" {
+    bucket         = "twc-terraform-state"
+    key            = "media/prod/terraform.tfstate"
+    region         = "ap-southeast-2"
+    encrypt        = true
+    dynamodb_table = "twc-terraform-locks"
+  }
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project     = "twc-media"
+      Environment = "prod"
+      ManagedBy   = "terraform"
+    }
+  }
+}
+
+module "storage" {
+  source = "../../modules/media-storage"
+
+  environment  = "prod"
+  kms_key_arn  = aws_kms_key.media.arn
+  cors_origins = ["https://app.twc.com", "https://admin.twc.com"]
+}
+
+module "database" {
+  source = "../../modules/media-database"
+
+  environment = "prod"
+  kms_key_arn = aws_kms_key.media.arn
+  tags        = local.tags
+}
+
+module "processing" {
+  source = "../../modules/media-processing"
+
+  environment         = "prod"
+  aws_region          = var.aws_region
+  s3_bucket_name      = module.storage.bucket_name
+  s3_bucket_arn       = module.storage.bucket_arn
+  dynamodb_table_name = module.database.asset_table_name
+  dynamodb_table_arn  = module.database.asset_table_arn
+
+  router_zip_path          = "${path.module}/../../dist/router.zip"
+  image_processor_zip_path = "${path.module}/../../dist/image-processor.zip"
+  doc_processor_zip_path   = "${path.module}/../../dist/doc-processor.zip"
+  video_trigger_zip_path   = "${path.module}/../../dist/video-trigger.zip"
+
+  sharp_layer_arn           = "arn:aws:lambda:ap-southeast-2:xxx:layer:sharp:1"
+  ecr_repository_url        = aws_ecr_repository.video.repository_url
+  video_processor_image_tag = var.video_processor_version
+
+  private_subnet_ids    = data.aws_subnets.private.ids
+  ecs_security_group_id = aws_security_group.ecs.id
+
+  tags = local.tags
+}
+
+module "monitoring" {
+  source = "../../modules/media-monitoring"
+
+  environment        = "prod"
+  lambda_router_name = module.processing.router_function_name
+  lambda_image_name  = module.processing.image_processor_function_name
+  lambda_doc_name    = module.processing.doc_processor_function_name
+  sqs_queue_name     = module.processing.video_queue_name
+  dlq_name           = module.processing.dlq_name
+  ecs_cluster_name   = module.processing.ecs_cluster_name
+  alert_email        = var.alert_email
+  slack_webhook_url  = var.slack_webhook_url
+  pagerduty_endpoint = var.pagerduty_endpoint
+
+  tags = local.tags
+}
+
+# KMS Key for encryption
+resource "aws_kms_key" "media" {
+  description             = "TWC Media encryption key"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+
+  tags = local.tags
+}
+
+resource "aws_kms_alias" "media" {
+  name          = "alias/twc-media-prod"
+  target_key_id = aws_kms_key.media.key_id
+}
+
+locals {
+  tags = {
+    Project     = "twc-media"
+    Environment = "prod"
+  }
+}
+```
+
+---
+
 ## Upload Flow (Phase 1)
 
 In Phase 1, users manually upload each variant. No auto-generation.
@@ -536,10 +2344,15 @@ In Phase 1, users manually upload each variant. No auto-generation.
 
 | Variant | Max Size | Allowed Formats | Notes |
 |---------|----------|-----------------|-------|
-| SMS | 1.2 MB | JPG, PNG, PDF | Compressed for MMS |
-| WhatsApp | 5 MB | JPG, PNG | WhatsApp Business API (no PDF) |
-| Email | 10 MB | PDF, JPG, PNG | Higher quality for email |
-| Original | 10 MB | PDF, JPG, PNG | Full quality archive |
+| SMS | 1.2 MB | JPG, PNG, GIF, PDF | Compressed for MMS |
+| WhatsApp | 5 MB (images), 16 MB (docs/video) | JPG, PNG, GIF, DOCX, XLSX, CSV, MP4 | No PDF for images |
+| Email | 25 MB | All supported formats | Most flexible |
+| Original | 100 MB | All supported formats | Full quality archive |
+
+**Automatic conversions on upload:**
+- HEIC → JPEG
+- MOV/WebM → MP4
+- Generate thumbnails for all types
 
 ### Upload Flow
 
